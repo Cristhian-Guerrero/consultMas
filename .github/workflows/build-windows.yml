@@ -23,46 +23,22 @@ jobs:
           python-version: '3.11'
           cache: 'pip'
 
-      # === Creamos y usamos SIEMPRE el mismo entorno ===
-      - name: Create venv and install deps
+      - name: Build and package app
         shell: powershell
         run: |
           $ErrorActionPreference = "Stop"
 
-          # 1) Crear venv
           python -m venv venv
-          if (!(Test-Path "venv\Scripts\python.exe")) { throw "Venv not created" }
+          .\venv\Scripts\Activate.ps1
 
-          # 2) Rutas convenientes
-          $PY = ".\venv\Scripts\python.exe"
-          $PIP = ".\venv\Scripts\pip.exe"
-
-          # 3) Actualizar herramientas base
-          & $PY -m pip install --upgrade pip setuptools wheel
-
-          # 4) Instalar requirements si existe
+          python -m pip install --upgrade pip setuptools wheel
           if (Test-Path "requirements.txt") {
-            & $PIP install -r requirements.txt
-          } else {
-            Write-Host "requirements.txt not found, continuing…"
+            pip install -r requirements.txt
           }
 
-          # 5) Instalar PyInstaller y utilidades necesarias
-          & $PIP install "pyinstaller>=6.6" pywin32-ctypes pefile
+          pip install "pyinstaller>=6.6" pywin32-ctypes pefile
 
-          # 6) Verificación dura: si falla, detener
-          & $PY -c "import PyInstaller, sys; print('PyInstaller', PyInstaller.__version__)"
-          & $PIP list
-
-      - name: Build .exe with PyInstaller
-        shell: powershell
-        timeout-minutes: 15
-        run: |
-          $ErrorActionPreference = "Stop"
-          $PY = ".\venv\Scripts\python.exe"
-
-          # Si app.py y logo.png NO están en la raíz, ajusta las rutas o usa working-directory
-          & $PY -m pyinstaller --clean --noconfirm `
+          pyinstaller --clean --noconfirm `
             --name="ConsultaDIAN" `
             --windowed `
             --onefile `
@@ -81,22 +57,10 @@ jobs:
         shell: powershell
         run: |
           if (Test-Path "dist\ConsultaDIAN.exe") {
-            Write-Host "OK: dist\ConsultaDIAN.exe generated"
-            Get-Item "dist\ConsultaDIAN.exe" | Format-List Name,Length,LastWriteTime
+            Write-Host "✅ dist\ConsultaDIAN.exe creado exitosamente"
           } else {
-            throw "Build failed: dist\ConsultaDIAN.exe not found"
+            throw "❌ No se generó dist\ConsultaDIAN.exe"
           }
-
-      - name: Create GitHub Release (only on tag)
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v1
-        with:
-          files: dist/ConsultaDIAN.exe
-          body: |
-            Consulta DIAN - build automático para Windows.
-            Versión: ${{ github.ref_name }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload artifact
         if: always()
