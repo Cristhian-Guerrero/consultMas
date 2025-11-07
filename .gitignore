@@ -1,0 +1,35 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# PyInstaller
+build/
+dist/
+*.spec
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Archivos de prueba
+test_*.xlsx
+resultado_*.xlsx
+*.log
+
+# Credenciales
+.env
+config.ini
+
+ConsultaDIAN_v4.3/
+ConsultaDIAN_v4.3.rar
+CloudFlareBypasser.py
