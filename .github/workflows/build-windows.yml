@@ -14,18 +14,21 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      # 1) Checkout
+      # ──────────────────────────────
+      # 1️⃣  Descargar código fuente
       - name: 📥 Checkout código
         uses: actions/checkout@v4
 
-      # 2) Python 3.11 con cache de pip
+      # ──────────────────────────────
+      # 2️⃣  Configurar Python
       - name: 🐍 Configurar Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           cache: 'pip'
 
-      # 3) Info del entorno (debug)
+      # ──────────────────────────────
+      # 3️⃣  Información de sistema
       - name: 🔍 Información del sistema
         shell: powershell
         run: |
@@ -33,31 +36,39 @@ jobs:
           pip --version
           echo "Sistema operativo: ${{ runner.os }}"
           echo "Arquitectura: ${{ runner.arch }}"
-          Write-Host "Contenido del directorio:"
+          Write-Host "📁 Archivos disponibles:"
           Get-ChildItem -Force | Format-Table -AutoSize
 
-      # 4) Dependencias (PowerShell; sin '||')
+      # ──────────────────────────────
+      # 4️⃣  Instalar dependencias
       - name: 📦 Instalar dependencias
         shell: powershell
-        env:
-          PIP_DISABLE_PIP_VERSION_CHECK: "1"
         run: |
+          Write-Host "🧩 Actualizando pip..."
           python -m pip install --upgrade pip
+
           if (Test-Path "requirements.txt") {
-            Write-Host "requirements.txt encontrado → instalando…"
+            Write-Host "✅ requirements.txt encontrado. Instalando dependencias..."
             pip install -r requirements.txt
           } else {
-            Write-Host "⚠️ No se encontró requirements.txt; continúo solo con build-time deps."
+            Write-Host "⚠️ No se encontró requirements.txt. Continuando..."
           }
-          # Asegurar PyInstaller y utilidades para Windows
-          pip install "pyinstaller>=6.6" pywin32-ctypes pefile
-          pyinstaller --version
+
+          Write-Host "📦 Instalando PyInstaller y dependencias de compilación..."
+          python -m pip install --upgrade pyinstaller pywin32-ctypes pefile
+
+          Write-Host "✅ PyInstaller instalado correctamente:"
+          python -m pyinstaller --version
+
+          Write-Host "📋 Lista de paquetes instalados:"
           pip list
 
-      # 5) Compilación .exe (usar backticks de PowerShell para multilínea)
+      # ──────────────────────────────
+      # 5️⃣  Compilar a ejecutable .exe
       - name: 🔨 Compilar aplicación a .exe
         shell: powershell
         run: |
+          Write-Host "🏗️ Iniciando compilación..."
           python -m pyinstaller --clean --noconfirm `
             --name="ConsultaDIAN" `
             --windowed `
@@ -73,19 +84,21 @@ jobs:
             --collect-all pandas `
             app.py
 
-      # 6) Verificar que se creó el ejecutable
+      # ──────────────────────────────
+      # 6️⃣  Verificar compilación
       - name: ✅ Verificar compilación
         shell: powershell
         run: |
           if (Test-Path "dist\ConsultaDIAN.exe") {
-            Write-Host "✅ Archivo .exe creado exitosamente"
+            Write-Host "✅ Archivo creado exitosamente:"
             Get-Item "dist\ConsultaDIAN.exe" | Format-List
           } else {
-            Write-Error "❌ No se creó dist\ConsultaDIAN.exe"
+            Write-Error "❌ No se generó el ejecutable dist\ConsultaDIAN.exe"
             exit 1
           }
 
-      # 7) Release (solo cuando hay tag v*)
+      # ──────────────────────────────
+      # 7️⃣  Crear release (solo si hay tag)
       - name: 📤 Crear GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v1
@@ -98,13 +111,14 @@ jobs:
             ### 📥 Instrucciones:
             1. Descarga `ConsultaDIAN.exe`
             2. Ejecuta el archivo (no requiere instalación)
-            3. Si SmartScreen avisa: “Más información” → “Ejecutar de todas formas”
+            3. Si SmartScreen advierte: “Más información” → “Ejecutar de todas formas”
             ---
             🏢 **A.S. Contadores & Asesores SAS**
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # 8) Artifact (siempre, incluso si falla más adelante)
+      # ──────────────────────────────
+      # 8️⃣  Subir como artifact (siempre)
       - name: 📎 Subir ejecutable como artifact
         if: always()
         uses: actions/upload-artifact@v4
