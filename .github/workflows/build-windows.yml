@@ -14,15 +14,18 @@ jobs:
     runs-on: windows-latest
 
     steps:
+      # 1) Checkout
       - name: 📥 Checkout código
         uses: actions/checkout@v4
 
+      # 2) Python 3.11 con cache de pip
       - name: 🐍 Configurar Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           cache: 'pip'
 
+      # 3) Info del entorno (debug)
       - name: 🔍 Información del sistema
         shell: powershell
         run: |
@@ -30,18 +33,28 @@ jobs:
           pip --version
           echo "Sistema operativo: ${{ runner.os }}"
           echo "Arquitectura: ${{ runner.arch }}"
+          Write-Host "Contenido del directorio:"
+          Get-ChildItem -Force | Format-Table -AutoSize
 
-      # 👉 AQUI instalamos PyInstaller y el resto de deps
+      # 4) Dependencias (PowerShell; sin '||')
       - name: 📦 Instalar dependencias
         shell: powershell
+        env:
+          PIP_DISABLE_PIP_VERSION_CHECK: "1"
         run: |
           python -m pip install --upgrade pip
-          # Si tu requirements.txt NO trae pyinstaller, lo instalamos explícitamente:
-          pip install -r requirements.txt || echo "requirements.txt no encontrado o vacío"
+          if (Test-Path "requirements.txt") {
+            Write-Host "requirements.txt encontrado → instalando…"
+            pip install -r requirements.txt
+          } else {
+            Write-Host "⚠️ No se encontró requirements.txt; continúo solo con build-time deps."
+          }
+          # Asegurar PyInstaller y utilidades para Windows
           pip install "pyinstaller>=6.6" pywin32-ctypes pefile
           pyinstaller --version
           pip list
 
+      # 5) Compilación .exe (usar backticks de PowerShell para multilínea)
       - name: 🔨 Compilar aplicación a .exe
         shell: powershell
         run: |
@@ -60,6 +73,7 @@ jobs:
             --collect-all pandas `
             app.py
 
+      # 6) Verificar que se creó el ejecutable
       - name: ✅ Verificar compilación
         shell: powershell
         run: |
@@ -67,10 +81,11 @@ jobs:
             Write-Host "✅ Archivo .exe creado exitosamente"
             Get-Item "dist\ConsultaDIAN.exe" | Format-List
           } else {
-            Write-Host "❌ ERROR: No se creó el archivo .exe"
+            Write-Error "❌ No se creó dist\ConsultaDIAN.exe"
             exit 1
           }
 
+      # 7) Release (solo cuando hay tag v*)
       - name: 📤 Crear GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v1
@@ -89,6 +104,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # 8) Artifact (siempre, incluso si falla más adelante)
       - name: 📎 Subir ejecutable como artifact
         if: always()
         uses: actions/upload-artifact@v4
