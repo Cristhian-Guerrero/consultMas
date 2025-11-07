@@ -1,4 +1,4 @@
-name: 🏗️ Build Windows Executable
+name: Build Windows Executable
 
 on:
   push:
@@ -10,57 +10,59 @@ on:
 
 jobs:
   build:
-    name: 📦 Compilar para Windows
+    name: Compile for Windows
     runs-on: windows-latest
 
     steps:
-      # 1️⃣ Checkout del código
-      - name: 📥 Checkout código
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2️⃣ Configurar Python
-      - name: 🐍 Configurar Python 3.11
+      - name: Setup Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           cache: 'pip'
 
-      # 3️⃣ Información del sistema
-      - name: 🔍 Información del sistema
+      # === Creamos y usamos SIEMPRE el mismo entorno ===
+      - name: Create venv and install deps
         shell: powershell
         run: |
-          python --version
-          pip --version
-          echo "Sistema operativo: ${{ runner.os }}"
-          echo "Arquitectura: ${{ runner.arch }}"
-          Write-Host "Archivos disponibles:"
-          Get-ChildItem -Force | Format-Table -AutoSize
+          $ErrorActionPreference = "Stop"
 
-      # 4️⃣ Instalar dependencias
-      - name: 📦 Instalar dependencias
-        shell: powershell
-        run: |
-          Write-Host "Actualizando pip..."
-          python -m pip install --upgrade pip
+          # 1) Crear venv
+          python -m venv venv
+          if (!(Test-Path "venv\Scripts\python.exe")) { throw "Venv not created" }
 
+          # 2) Rutas convenientes
+          $PY = ".\venv\Scripts\python.exe"
+          $PIP = ".\venv\Scripts\pip.exe"
+
+          # 3) Actualizar herramientas base
+          & $PY -m pip install --upgrade pip setuptools wheel
+
+          # 4) Instalar requirements si existe
           if (Test-Path "requirements.txt") {
-            Write-Host "requirements.txt encontrado. Instalando dependencias..."
-            pip install -r requirements.txt
+            & $PIP install -r requirements.txt
           } else {
-            Write-Host "No se encontró requirements.txt. Continuando..."
+            Write-Host "requirements.txt not found, continuing…"
           }
 
-          Write-Host "Instalando PyInstaller y dependencias de build..."
-          python -m pip install --upgrade pyinstaller pywin32-ctypes pefile
-          Write-Host "PyInstaller versión:"
-          python -m pyinstaller --version
-          pip list
+          # 5) Instalar PyInstaller y utilidades necesarias
+          & $PIP install "pyinstaller>=6.6" pywin32-ctypes pefile
 
-      # 5️⃣ Compilar .exe
-      - name: 🔨 Compilar aplicación a .exe
+          # 6) Verificación dura: si falla, detener
+          & $PY -c "import PyInstaller, sys; print('PyInstaller', PyInstaller.__version__)"
+          & $PIP list
+
+      - name: Build .exe with PyInstaller
         shell: powershell
+        timeout-minutes: 15
         run: |
-          python -m pyinstaller --clean --noconfirm `
+          $ErrorActionPreference = "Stop"
+          $PY = ".\venv\Scripts\python.exe"
+
+          # Si app.py y logo.png NO están en la raíz, ajusta las rutas o usa working-directory
+          & $PY -m pyinstaller --clean --noconfirm `
             --name="ConsultaDIAN" `
             --windowed `
             --onefile `
@@ -75,39 +77,28 @@ jobs:
             --collect-all pandas `
             app.py
 
-      # 6️⃣ Verificar compilación
-      - name: ✅ Verificar compilación
+      - name: Verify build output
         shell: powershell
         run: |
           if (Test-Path "dist\ConsultaDIAN.exe") {
-            Write-Host "✅ Archivo .exe creado exitosamente"
-            Get-Item "dist\ConsultaDIAN.exe" | Format-List
+            Write-Host "OK: dist\ConsultaDIAN.exe generated"
+            Get-Item "dist\ConsultaDIAN.exe" | Format-List Name,Length,LastWriteTime
           } else {
-            Write-Error "❌ No se generó dist\ConsultaDIAN.exe"
-            exit 1
+            throw "Build failed: dist\ConsultaDIAN.exe not found"
           }
 
-      # 7️⃣ Crear release (solo en tags)
-      - name: 📤 Crear GitHub Release
+      - name: Create GitHub Release (only on tag)
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v1
         with:
           files: dist/ConsultaDIAN.exe
           body: |
-            ## 🚀 Consulta DIAN - A.S. Contadores & Asesores SAS
-            ### 📋 Versión: ${{ github.ref_name }}
-            **Compilado automáticamente en Windows Server**
-            ### 📥 Instrucciones:
-            1. Descarga `ConsultaDIAN.exe`
-            2. Ejecuta el archivo (no requiere instalación)
-            3. Si SmartScreen advierte: “Más información” → “Ejecutar de todas formas”
-            ---
-            🏢 **A.S. Contadores & Asesores SAS**
+            Consulta DIAN - build automático para Windows.
+            Versión: ${{ github.ref_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # 8️⃣ Subir ejecutable como artifact
-      - name: 📎 Subir ejecutable como artifact
+      - name: Upload artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
