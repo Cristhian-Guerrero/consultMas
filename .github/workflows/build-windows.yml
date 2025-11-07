@@ -51,7 +51,7 @@ jobs:
 # ─────── PASO 5: Compilar con PyInstaller ───────
     - name: 🔨 Compilar aplicación a .exe
       run: |
-        python -m PyInstaller --clean --noconfirm `
+        python -m pyinstaller --clean --noconfirm `
           --name="ConsultaDIAN" `
           --windowed `
           --onefile `
