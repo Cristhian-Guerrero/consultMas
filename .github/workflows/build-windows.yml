@@ -48,16 +48,14 @@ jobs:
         pip install -r requirements.txt
         pip list
     
-    # ─────── PASO 5: Compilar con PyInstaller ───────
+# ─────── PASO 5: Compilar con PyInstaller ───────
     - name: 🔨 Compilar aplicación a .exe
       run: |
-        pyinstaller --clean --noconfirm `
+        python -m PyInstaller --clean --noconfirm `
           --name="ConsultaDIAN" `
           --windowed `
           --onefile `
-          --icon=dian.ico `
           --add-data="logo.png;." `
-          --add-data="dian.ico;." `
           --hidden-import=DrissionPage `
           --hidden-import=pandas `
           --hidden-import=openpyxl `
