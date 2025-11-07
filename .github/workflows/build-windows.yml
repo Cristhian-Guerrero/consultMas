@@ -1,118 +1,98 @@
-# ═══════════════════════════════════════════════════════════════
-# GitHub Actions Workflow - Compilación Automática Windows .exe
-# A.S. Contadores & Asesores SAS
-# ═══════════════════════════════════════════════════════════════
-
 name: 🏗️ Build Windows Executable
 
-# ═══ CUÁNDO SE EJECUTA ═══
 on:
   push:
-    branches: [ main, master ]  # Cuando hagas push a main/master
-    tags:
-      - 'v*'                     # O cuando crees un tag tipo v1.0.0
+    branches: [ main, master ]
+    tags: [ 'v*' ]
   pull_request:
     branches: [ main, master ]
-  workflow_dispatch:             # O manualmente desde GitHub
+  workflow_dispatch:
 
-# ═══ TRABAJOS A EJECUTAR ═══
 jobs:
   build:
     name: 📦 Compilar para Windows
-    runs-on: windows-latest      # Usa Windows Server (gratis en GitHub)
-    
+    runs-on: windows-latest
+
     steps:
-    # ─────── PASO 1: Descargar código ───────
-    - name: 📥 Checkout código
-      uses: actions/checkout@v4
-      
-    # ─────── PASO 2: Instalar Python ───────
-    - name: 🐍 Configurar Python 3.11
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.11'
-        cache: 'pip'              # Cachear pip para más velocidad
-    
-    # ─────── PASO 3: Mostrar info (debug) ───────
-    - name: 🔍 Información del sistema
-      run: |
-        python --version
-        pip --version
-        echo "Sistema operativo: ${{ runner.os }}"
-        echo "Arquitectura: ${{ runner.arch }}"
-    
-    # ─────── PASO 4: Instalar dependencias ───────
-    - name: 📦 Instalar dependencias
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip list
-    
-# ─────── PASO 5: Compilar con PyInstaller ───────
-    - name: 🔨 Compilar aplicación a .exe
-      run: |
-        python -m pyinstaller --clean --noconfirm `
-          --name="ConsultaDIAN" `
-          --windowed `
-          --onefile `
-          --add-data="logo.png;." `
-          --hidden-import=DrissionPage `
-          --hidden-import=pandas `
-          --hidden-import=openpyxl `
-          --hidden-import=xlsxwriter `
-          --hidden-import=PIL `
-          --hidden-import=pygetwindow `
-          --collect-all DrissionPage `
-          --collect-all pandas `
-          app.py
-    
-    # ─────── PASO 6: Verificar que se creó ───────
-    - name: ✅ Verificar compilación
-      run: |
-        if (Test-Path "dist\ConsultaDIAN.exe") {
-          Write-Host "✅ Archivo .exe creado exitosamente"
-          Get-Item "dist\ConsultaDIAN.exe" | Format-List
-        } else {
-          Write-Host "❌ ERROR: No se creó el archivo .exe"
-          exit 1
-        }
-    
-    # ─────── PASO 7: Crear Release automático ───────
-    - name: 📤 Crear GitHub Release
-      if: startsWith(github.ref, 'refs/tags/')  # Solo si es un tag
-      uses: softprops/action-gh-release@v1
-      with:
-        files: |
-          dist/ConsultaDIAN.exe
-        body: |
-          ## 🚀 Consulta DIAN - A.S. Contadores & Asesores SAS
-          
-          ### 📋 Versión: ${{ github.ref_name }}
-          
-          **Compilado automáticamente en Windows Server**
-          
-          ### 📥 Instrucciones de instalación:
-          1. Descarga `ConsultaDIAN.exe`
-          2. Ejecuta el archivo (no requiere instalación)
-          3. Si Windows SmartScreen pregunta, click "Más información" → "Ejecutar de todas formas"
-          
-          ### ✨ Características:
-          - ✅ Consulta Básica DIAN
-          - ✅ Consulta Detallada RUT
-          - ✅ Procesamiento masivo Excel/CSV
-          - ✅ Generación automática de reportes
-          
-          ---
-          🏢 **A.S. Contadores & Asesores SAS**
-        draft: false
-        prerelease: false
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    
-    # ─────── PASO 8: Subir como artifact (siempre) ───────
-    - name: 📎 Subir ejecutable como artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: ConsultaDIAN-Windows-${{ github.sha }}
-        path: dist/ConsultaDIAN.exe
-        retention-days: 30  # Guardar 30 días
+      - name: 📥 Checkout código
+        uses: actions/checkout@v4
+
+      - name: 🐍 Configurar Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 🔍 Información del sistema
+        shell: powershell
+        run: |
+          python --version
+          pip --version
+          echo "Sistema operativo: ${{ runner.os }}"
+          echo "Arquitectura: ${{ runner.arch }}"
+
+      # 👉 AQUI instalamos PyInstaller y el resto de deps
+      - name: 📦 Instalar dependencias
+        shell: powershell
+        run: |
+          python -m pip install --upgrade pip
+          # Si tu requirements.txt NO trae pyinstaller, lo instalamos explícitamente:
+          pip install -r requirements.txt || echo "requirements.txt no encontrado o vacío"
+          pip install "pyinstaller>=6.6" pywin32-ctypes pefile
+          pyinstaller --version
+          pip list
+
+      - name: 🔨 Compilar aplicación a .exe
+        shell: powershell
+        run: |
+          python -m pyinstaller --clean --noconfirm `
+            --name="ConsultaDIAN" `
+            --windowed `
+            --onefile `
+            --add-data="logo.png;." `
+            --hidden-import=DrissionPage `
+            --hidden-import=pandas `
+            --hidden-import=openpyxl `
+            --hidden-import=xlsxwriter `
+            --hidden-import=PIL `
+            --hidden-import=pygetwindow `
+            --collect-all DrissionPage `
+            --collect-all pandas `
+            app.py
+
+      - name: ✅ Verificar compilación
+        shell: powershell
+        run: |
+          if (Test-Path "dist\ConsultaDIAN.exe") {
+            Write-Host "✅ Archivo .exe creado exitosamente"
+            Get-Item "dist\ConsultaDIAN.exe" | Format-List
+          } else {
+            Write-Host "❌ ERROR: No se creó el archivo .exe"
+            exit 1
+          }
+
+      - name: 📤 Crear GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: dist/ConsultaDIAN.exe
+          body: |
+            ## 🚀 Consulta DIAN - A.S. Contadores & Asesores SAS
+            ### 📋 Versión: ${{ github.ref_name }}
+            **Compilado automáticamente en Windows Server**
+            ### 📥 Instrucciones:
+            1. Descarga `ConsultaDIAN.exe`
+            2. Ejecuta el archivo (no requiere instalación)
+            3. Si SmartScreen avisa: “Más información” → “Ejecutar de todas formas”
+            ---
+            🏢 **A.S. Contadores & Asesores SAS**
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 📎 Subir ejecutable como artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ConsultaDIAN-Windows-${{ github.sha }}
+          path: dist/ConsultaDIAN.exe
+          retention-days: 30
