@@ -761,7 +761,7 @@ class ConsultaRUTApp(tk.Tk):
         super().__init__()
         
         # ═══ CONFIGURACIÓN INICIAL ═══
-        self.title("Consulta Gestión Masiva DIAN DUAL | A.S. Contadores & Asesores SAS")
+        self.title("Consulta Gestión Masiva DIAN | A.S. Contadores & Asesores SAS")
         self.ejecucion_activa = threading.Event()
         self.detener_proceso = False
         
@@ -1053,14 +1053,14 @@ class ConsultaRUTApp(tk.Tk):
         info_container.grid(row=0, column=1, sticky="ew", pady=10)
         
         main_title = ttk.Label(info_container,
-                              text="Gestión Masiva DIAN DUAL",
+                              text="Gestión Masiva DIAN",
                               font=('Arial', 22, 'bold'),
                               background=self.COLORS['primary'],
                               foreground=self.COLORS['text_light'])
         main_title.pack(anchor="w", pady=(0, 4))
         
         subtitle = ttk.Label(info_container,
-                           text="Sistema automatizado consulta básica y detallada RUT",
+                           text="Sistema automatizado de consulta básica rápida",
                            font=('Arial', 12),
                            background=self.COLORS['primary'],
                            foreground=self.COLORS['text_light'])
@@ -1084,7 +1084,7 @@ class ConsultaRUTApp(tk.Tk):
         
         # ═══ FILA 1: SELECTOR DE TIPO DE CONSULTA ═══
         selector_frame = ttk.LabelFrame(main_container, 
-                                      text="🎯 Tipo de Consulta", 
+                                      text="🎯 Modo de Consulta",
                                       style='Card.TLabelframe',
                                       padding="12")
         selector_frame.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 10))
@@ -1103,13 +1103,14 @@ class ConsultaRUTApp(tk.Tk):
         self.radio_basica.pack(side=tk.LEFT, padx=(0, 30))
         
         # Radio button para consulta detallada
-        self.radio_detallada = ttk.Radiobutton(radio_container,
+        """self.radio_detallada = ttk.Radiobutton(radio_container,
                                              text="🔍 RUT Detallada (Completa)",
                                              variable=self.tipo_consulta,
                                              value="rut_detallado",
                                              style='Consulta.TRadiobutton',
                                              command=self.on_tipo_consulta_changed)
         self.radio_detallada.pack(side=tk.LEFT)
+        """
         
         # ═══ FILA 2: CONTROLES ═══
         controls_frame = ttk.LabelFrame(main_container, 
@@ -1220,7 +1221,7 @@ class ConsultaRUTApp(tk.Tk):
                           f"Sistema de Consulta Automatizada DIAN DUAL\n\n"
                           f"🎯 OPCIONES DISPONIBLES:\n"
                           f"   📋 Consulta Básica: Información general rápida\n"
-                          f"   🔍 Consulta Detallada RUT: Estado + razón social\n\n"
+                          
                           f"✅ NAVEGADORES INVISIBLES AL USUARIO\n"
                           f"💼 FIRMA ESPECIALIZADA EN:\n"
                           f"   • Asesoría Contable y Financiera\n"

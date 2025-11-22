@@ -43,6 +43,7 @@ jobs:
             --windowed `
             --onefile `
             --add-data="logo.png;." `
+            --add-data="dian.ico;." `
             --hidden-import=DrissionPage `
             --hidden-import=pandas `
             --hidden-import=openpyxl `
