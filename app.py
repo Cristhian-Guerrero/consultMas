@@ -30,7 +30,7 @@ else:
 
 
 # ─────── Configuración DUAL ────────
-# ═══ CONSULTA BÁSICA (ORIGINAL) ═══
+# ═══ CONSULTA Express (ORIGINAL) ═══
 DIAN_URL_BASICA = os.getenv(
     "DIAN_URL",
     "https://muisca.dian.gov.co/WebGestionmasiva/DefSelPublicacionesExterna.faces"
@@ -111,9 +111,9 @@ def calcular_dv(nit: str) -> str:
         print(f"Error calculando DV para NIT {nit}: {str(e)}")
         return "0"
 
-# ═══ CONFIGURACIÓN DUAL - OPTIMIZADA SOLO PARA BÁSICA ═══
+# ═══ CONFIGURACIÓN DUAL - OPTIMIZADA SOLO PARA Express ═══
 class TimeoutConfig:
-    # Timeouts OPTIMIZADOS para consulta básica
+    # Timeouts OPTIMIZADOS para consulta Express
     INITIAL_WAIT = 0.7        # OPTIMIZADO: 2 → 1
     POST_NIT_WAIT = 0.5       # OPTIMIZADO: 3 → 0.8 
     RESULTS_WAIT = 2.0        # OPTIMIZADO: 4 → 2.5
@@ -487,9 +487,9 @@ def check_no_inconsistencias_and_close(driver):
         print(f"Error en check_no_inconsistencias_and_close: {e}")
         return False
 
-# ═══ FUNCIÓN DE CONSULTA BÁSICA OPTIMIZADA ═══
+# ═══ FUNCIÓN DE CONSULTA Express OPTIMIZADA ═══
 def consultar_nit_basica(nit: str, attempt: int = 1):
-    """CONSULTA BÁSICA OPTIMIZADA - SOLO TIMEOUTS MEJORADOS"""
+    """CONSULTA EXPRESS OPTIMIZADA - SOLO TIMEOUTS MEJORADOS"""
     driver = None
     try:
         driver = get_browser_from_pool()
@@ -1060,7 +1060,7 @@ class ConsultaRUTApp(tk.Tk):
         main_title.pack(anchor="w", pady=(0, 4))
         
         subtitle = ttk.Label(info_container,
-                           text="Sistema automatizado de consulta básica rápida",
+                           text="Sistema automatizado de consulta Express",
                            font=('Arial', 12),
                            background=self.COLORS['primary'],
                            foreground=self.COLORS['text_light'])
@@ -1093,9 +1093,9 @@ class ConsultaRUTApp(tk.Tk):
         radio_container = ttk.Frame(selector_frame, style='Main.TFrame')
         radio_container.pack(fill=tk.X)
         
-        # Radio button para consulta básica
+        # Radio button para consulta Express
         self.radio_basica = ttk.Radiobutton(radio_container,
-                                          text="📋 Básica (Rápida)",
+                                          text="📋 Express",
                                           variable=self.tipo_consulta,
                                           value="basica",
                                           style='Consulta.TRadiobutton',
@@ -1157,7 +1157,7 @@ class ConsultaRUTApp(tk.Tk):
         
         # Indicador de tipo de consulta activa
         self.label_tipo_activo = ttk.Label(progress_frame,
-                                         text="📋 Consulta Básica seleccionada",
+                                         text="📋 Consulta Express seleccionada",
                                          style='Status.TLabel')
         self.label_tipo_activo.pack(anchor="w", pady=(0, 8))
         
@@ -1220,7 +1220,7 @@ class ConsultaRUTApp(tk.Tk):
         initial_message = (f"🏢 A.S. CONTADORES & ASESORES SAS\n"
                           f"Sistema de Consulta Automatizada DIAN DUAL\n\n"
                           f"🎯 OPCIONES DISPONIBLES:\n"
-                          f"   📋 Consulta Básica: Información general rápida\n"
+                          f"   📋 Consulta Express: Información general rápida\n"
                           
                           f"✅ NAVEGADORES INVISIBLES AL USUARIO\n"
                           f"💼 FIRMA ESPECIALIZADA EN:\n"
@@ -1241,7 +1241,7 @@ class ConsultaRUTApp(tk.Tk):
         footer_frame.pack(fill=tk.X, side=tk.BOTTOM)
         
         footer_text = ttk.Label(footer_frame,
-                              text="© 2025 A.S. Contadores & Asesores SAS | V4.3 CG",
+                              text="© 2026 A.S. Contadores & Asesores SAS | V4.4 CG",
                               style='Status.TLabel')
         footer_text.pack()
     
@@ -1249,7 +1249,7 @@ class ConsultaRUTApp(tk.Tk):
         """Callback cuando cambia el tipo de consulta"""
         tipo = self.tipo_consulta.get()
         if tipo == "basica":
-            self.label_tipo_activo.config(text="📋 Consulta Básica seleccionada (Rápida)")
+            self.label_tipo_activo.config(text="📋 Consulta Express seleccionada (Rápida)")
             self.add_result_message("📋 Modo Básico: Consulta rápida de información general", "INFO")
         else:
             self.label_tipo_activo.config(text="🔍 Consulta Detallada RUT seleccionada (Completa)")
@@ -1362,7 +1362,7 @@ class ConsultaRUTApp(tk.Tk):
             self.update_stats(total, 0, 0)
             
             tipo = self.tipo_consulta.get()
-            tipo_texto = "Básica" if tipo == "basica" else "Detallada RUT"
+            tipo_texto = "Express" if tipo == "basica" else "Detallada RUT"
             
             self.label_status.config(text=f"Iniciando consulta {tipo_texto}: {total} NITs")
             self.add_result_message(f"Procesando {total} NITs - Tipo: {tipo_texto}", "SUCCESS")
@@ -1393,7 +1393,7 @@ class ConsultaRUTApp(tk.Tk):
         self.progress_bar["value"] = count
         if nit:
             tipo = self.tipo_consulta.get()
-            tipo_texto = "Básica" if tipo == "basica" else "RUT"
+            tipo_texto = "Express" if tipo == "basica" else "RUT"
             self.label_status.config(text=f"Consultando {tipo_texto}: {nit} ({count}/{total})")
         else:
             self.label_status.config(text=f"Procesando: {count}/{total}")
@@ -1428,7 +1428,7 @@ class ConsultaRUTApp(tk.Tk):
             
             # Obtener tipo de consulta seleccionado
             tipo_seleccionado = self.tipo_consulta.get()
-            tipo_texto = "Básica (Rápida)" if tipo_seleccionado == "basica" else "Detallada RUT (Completa)"
+            tipo_texto = "Express" if tipo_seleccionado == "basica" else "Detallada RUT (Completa)"
             
             self.add_result_message(f"🚀 Procesando {total_nits} NITs - Modo: {tipo_texto}", "SUCCESS")
             self.add_result_message(f"🏛️ Inicializando sistema de consulta {tipo_texto.lower()}", "INFO")
@@ -1455,14 +1455,14 @@ class ConsultaRUTApp(tk.Tk):
                 
                 # Manejo de reintentos
                 if resultado.get("status") == "retry":
-                    tipo_msg = "básica" if tipo_seleccionado == "basica" else "RUT detallada"
+                    tipo_msg = "Express" if tipo_seleccionado == "basica" else "RUT detallada"
                     self.add_result_message(f"🔄 Verificando nuevamente información {tipo_msg} de NIT {nit}", "WARNING")
-                    time.sleep(1.0 if tipo_seleccionado == "basica" else 2.5)  # OPTIMIZADO PARA BÁSICA
+                    time.sleep(1.0 if tipo_seleccionado == "basica" else 2.5)  # OPTIMIZADO PARA Express
                     resultado = consultar_nit_individual(nit, tipo_seleccionado, attempt=2)
                     
                     if resultado.get("status") == "retry":
                         self.add_result_message(f"🔍 Validación adicional {tipo_msg} para NIT {nit}", "WARNING")
-                        time.sleep(1.5 if tipo_seleccionado == "basica" else 3.5)  # OPTIMIZADO PARA BÁSICA
+                        time.sleep(1.5 if tipo_seleccionado == "basica" else 3.5)  # OPTIMIZADO PARA Express
                         resultado = consultar_nit_individual(nit, tipo_seleccionado, attempt=3)
                 
                 if resultado.get("status") == "success":
@@ -1475,7 +1475,7 @@ class ConsultaRUTApp(tk.Tk):
                     
                     # ═══ ESTRUCTURA DUAL DE EXCEL ═══
                     if tipo_seleccionado == "basica":
-                        # Estructura para consulta básica (orden original corregido)
+                        # Estructura para consulta Express (orden original corregido)
                         fila_excel = {
                             "NIT": nit,
                             "DV": data.get("dv", calcular_dv(nit)),
@@ -1486,8 +1486,8 @@ class ConsultaRUTApp(tk.Tk):
                             "Razón Social": limpiar_campo(data.get("razonSocial", "")),
                             "Fecha Consulta": data.get("datetime", ""),
                             "Estado Consulta": "Exitoso",
-                            "Tipo de Consulta": "Básica",
-                            "Observaciones": data.get("observacion", "Consulta básica exitosa")
+                            "Tipo de Consulta": "Express",
+                            "Observaciones": data.get("observacion", "Consulta Express exitosa")
                         }
                     else:
                         # Estructura para consulta RUT detallada
@@ -1550,7 +1550,7 @@ class ConsultaRUTApp(tk.Tk):
                             "Razón Social": "Error en consulta",
                             "Fecha Consulta": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                             "Estado Consulta": "Error",
-                            "Tipo de Consulta": "Básica",
+                            "Tipo de Consulta": "Express",
                             "Observaciones": error_msg
                         }
                     else:
@@ -1655,7 +1655,7 @@ class ConsultaRUTApp(tk.Tk):
                 df_out['DV'] = pd.to_numeric(df_out['DV'], errors='coerce').fillna(0).astype('int64')
             
             tipo = self.tipo_consulta.get()
-            tipo_texto = "basica" if tipo == "basica" else "rut_detallado"
+            tipo_texto = "express" if tipo == "basica" else "rut_detallado"
             fname = f"resultado_completo_{tipo_texto}_{datetime.now():%Y%m%d_%H%M%S}.xlsx"
             
             with pd.ExcelWriter(fname, engine='xlsxwriter') as writer:
@@ -1685,7 +1685,7 @@ class ConsultaRUTApp(tk.Tk):
                     'align': 'center', 'valign': 'vcenter', 'bg_color': '#FDF2F8',
                     'font_name': 'Arial'
                 })
-                titulo = f'[PARCIAL - BÁSICA] Consulta DIAN Profesional - A.S. Contadores & Asesores SAS - {datetime.now().strftime("%d/%m/%Y %H:%M")}'
+                titulo = f'[PARCIAL - Express] Consulta DIAN Profesional - A.S. Contadores & Asesores SAS - {datetime.now().strftime("%d/%m/%Y %H:%M")}'
             else:
                 title_format = workbook.add_format({
                     'bold': True, 'font_size': 16, 'font_color': '#1565C0',
@@ -1700,7 +1700,7 @@ class ConsultaRUTApp(tk.Tk):
                     'align': 'center', 'valign': 'vcenter', 'bg_color': '#E8F5E9',
                     'font_name': 'Arial'
                 })
-                titulo = f'Consulta Gestión Masiva DIAN BÁSICA - A.S. Contadores & Asesores SAS - {datetime.now().strftime("%d/%m/%Y %H:%M")}'
+                titulo = f'Consulta Gestión Masiva DIAN Express- A.S. Contadores & Asesores SAS - {datetime.now().strftime("%d/%m/%Y %H:%M")}'
             else:
                 title_format = workbook.add_format({
                     'bold': True, 'font_size': 16, 'font_color': '#0D47A1',
@@ -1849,7 +1849,7 @@ class ConsultaRUTApp(tk.Tk):
 def main():
     try:
         print("🚀 === CONSULTA DIAN - A.S. CONTADORES & ASESORES SAS ===")
-        print("🎯 Iniciando sistema dual con consulta básica y detallada RUT...")
+        print("🎯 Iniciando sistema dual con consulta Express y detallada RUT...")
         print("✨ Navegadores configurados para ser invisibles al usuario...")
         app = ConsultaRUTApp()
         print("✅ Sistema profesional dual iniciado exitosamente")
