@@ -768,31 +768,32 @@ class ConsultaRUTApp(tk.Tk):
         # ═══ NUEVA VARIABLE PARA TIPO DE CONSULTA ═══
         self.tipo_consulta = tk.StringVar(value="basica")
         
-        # ═══ PALETA DE COLORES ═══
+        # ═══ PALETA DE COLORES (CORREGIDA PARA FONDO BLANCO) ═══
         self.COLORS = {
-            'primary': "#91CA94",
-            'primary_light': "#225F24",
-            'primary_dark': '#0D4E14',
-            'secondary': '#2E7D32',
-            'accent': "#2A552C",
-            'background': '#FAFAFA',
-            'surface': '#FFFFFF',
-            'text_primary': '#212121',
-            'text_secondary': '#757575',
-            'text_light': '#FFFFFF',
-            'success': "#164D17",
-            'warning': '#FF9800',
-            'error': '#F44336',
-            'border': '#E0E0E0',
+            'primary': "#166534",         # Verde Bosque Profesional (Más oscuro y elegante)
+            'primary_light': "#DCFCE7",   # Fondo menta muy suave (para selecciones)
+            'primary_dark': '#14532D',    # Verde muy oscuro para textos importantes
+            'secondary': '#64748B',       # Gris Slate (Botones secundarios)
+            'accent': "#0F766E",          # Teal profesional
+            'background': '#F8FAFC',      # Gris casi blanco (Fondo general)
+            'surface': '#FFFFFF',         # Blanco absoluto (Tarjetas y Header)
+            'text_primary': '#1E293B',    # Azul grisáceo muy oscuro (Mejor que negro)
+            'text_secondary': '#64748B',  # Gris medio suave
+            'text_light': '#FFFFFF',      # Texto blanco (solo para botones sólidos)
+            'success': "#15803D",         # Verde éxito
+            'warning': '#B45309',         # Naranja quemado
+            'error': '#B91C1C',           # Rojo rubí
+            'border': '#E2E8F0',          # Borde gris muy sutil
         }
         
-        # ═══ FUENTES OPTIMIZADAS ═══
+        # ═══ FUENTES NATIVAS (EVITA EL PIXELADO DE TEXTO) ═══
+        # Usamos Segoe UI (Windows) por defecto, es mucho más nítida que Arial
         self.FONTS = {
-            'title': ('Arial', 18, 'bold'),
-            'subtitle': ('Arial', 11, 'bold'),
-            'body': ('Arial', 9),
-            'button': ('Arial', 9, 'bold'),
-            'small': ('Arial', 8),
+            'title': ('Segoe UI', 20, 'bold'),
+            'subtitle': ('Segoe UI', 11, 'bold'),
+            'body': ('Segoe UI', 10),
+            'button': ('Segoe UI', 9, 'bold'),
+            'small': ('Segoe UI', 9),
         }
         
         # ═══ CONFIGURACIÓN DE VENTANA ═══
@@ -831,34 +832,38 @@ class ConsultaRUTApp(tk.Tk):
         self.geometry(f'{width}x{height}+{x}+{y}')
     
     def setup_improved_icon(self):
-        """Configuración del ícono corporativo"""
+        """Configuración BLINDADA del ícono (Windows/Linux)"""
         try:
-            icon_path = self.resource_path("dian.ico")
+            # 1. Definir rutas absolutas
+            icon_path = os.path.abspath(self.resource_path("dian.ico"))
+            logo_path = os.path.abspath(self.resource_path("logo.png"))
+            
+            icon_set = False
+
+            # 2. Intentar método nativo de Windows (.ico)
             if os.path.exists(icon_path):
                 try:
-                    self.iconbitmap(icon_path)
-                    print(f"✅ ÉXITO: Ícono .ico configurado -> {icon_path}")
-                    return
+                    # 'default' aplica el ícono a esta ventana y futuras
+                    self.iconbitmap(default=icon_path)
+                    icon_set = True
+                    print(f"✅ Ícono .ico cargado: {icon_path}")
                 except Exception as e:
-                    print(f"⚠️ Error con .ico: {e}")
+                    print(f"⚠️ No se pudo cargar .ico (intentando PNG): {e}")
             
-            logo_path = self.resource_path("logo.png")
-            if os.path.exists(logo_path):
+            # 3. Si falló el .ico o no existe, intentar usar el PNG con iconphoto
+            if not icon_set and os.path.exists(logo_path):
                 try:
-                    pil_image = Image.open(logo_path)
-                    icon_32 = pil_image.resize((32, 32), Image.Resampling.LANCZOS)
-                    icon_tk_32 = ImageTk.PhotoImage(icon_32)
-                    self.iconphoto(True, icon_tk_32)
-                    self.icon_refs = [icon_tk_32]
-                    print(f"✅ ÉXITO: Logo PNG convertido a ícono 32x32px")
-                    return
+                    img = Image.open(logo_path)
+                    photo = ImageTk.PhotoImage(img)
+                    # True = aplica a todas las ventanas de la app
+                    self.iconphoto(True, photo)
+                    self.icon_refs = [photo] # Evitar garbage collection
+                    print(f"✅ Logo PNG usado como ícono")
                 except Exception as e:
-                    print(f"⚠️ Error convirtiendo PNG: {e}")
-            
-            print("🔄 Usando ícono por defecto del sistema")
-                
+                    print(f"❌ Falló fallback a PNG: {e}")
+
         except Exception as e:
-            print(f"❌ Error general configurando ícono: {e}")
+            print(f"❌ Error crítico configurando ícono: {e}")
     
     def resource_path(self, relative_path):
         """Obtiene la ruta de recursos"""
@@ -902,110 +907,121 @@ class ConsultaRUTApp(tk.Tk):
             return None
     
     def setup_compact_styles(self):
-        """Configura estilos compactos y profesionales"""
+        """Configura estilos modernos estilo Dashboard (Clean White)"""
         self.style = ttk.Style()
-        self.style.theme_use('clam')
+        self.style.theme_use('clam')  # 'clam' permite mejor personalización
         
-        # ═══ ESTILOS EXISTENTES ═══
-        self.style.configure('Professional.TFrame', 
+        # ═══ CONFIGURACIÓN GENERAL ═══
+        self.configure(bg=self.COLORS['background'])
+        
+        # ═══ ESTILOS DE CONTENEDORES (FRAMES) ═══
+        # Header: Ahora BLANCO para que el logo resalte perfecto
+        self.style.configure('Header.TFrame', 
                            background=self.COLORS['surface'],
-                           relief='flat',
-                           borderwidth=0)
+                           relief='flat')
         
-        self.style.configure('Header.TFrame',
-                           background=self.COLORS['primary'],
-                           relief='flat',
-                           borderwidth=0)
-        
+        # Panel Principal
         self.style.configure('Main.TFrame', 
+                           background=self.COLORS['background'],
+                           relief='flat')
+        
+        # Tarjetas (Card): Fondo blanco con borde sutil
+        self.style.configure('Card.TLabelframe',
                            background=self.COLORS['surface'],
                            relief='solid',
-                           borderwidth=1)
-        
-        # ═══ NUEVOS ESTILOS PARA RADIO BUTTONS ═══
-        self.style.configure('Consulta.TRadiobutton',
+                           borderwidth=1,
+                           bordercolor=self.COLORS['border'])
+                           
+        self.style.configure('Card.TLabelframe.Label',
                            background=self.COLORS['surface'],
-                           foreground=self.COLORS['text_primary'],
-                           font=self.FONTS['body'],
-                           focuscolor='none')
-        
-        self.style.map('Consulta.TRadiobutton',
-                      background=[('active', self.COLORS['primary_light']),
-                                ('selected', self.COLORS['primary'])])
-        
-        # ═══ LABELS ═══
+                           foreground=self.COLORS['primary'], # Título verde corporativo
+                           font=self.FONTS['subtitle'])
+
+        # ═══ TEXTOS (LABELS) ═══
+        # Título Principal (Ahora Verde sobre Blanco)
         self.style.configure('HeaderTitle.TLabel',
-                           background=self.COLORS['primary'],
-                           foreground=self.COLORS['text_light'],
+                           background=self.COLORS['surface'],
+                           foreground=self.COLORS['primary'],
                            font=self.FONTS['title'])
         
+        # Subtítulos (Gris sobre Blanco)
         self.style.configure('HeaderSub.TLabel',
-                           background=self.COLORS['primary'],
-                           foreground=self.COLORS['text_light'],
+                           background=self.COLORS['surface'],
+                           foreground=self.COLORS['text_secondary'],
                            font=self.FONTS['body'])
         
+        # Textos normales
         self.style.configure('Body.TLabel',
                            background=self.COLORS['surface'],
                            foreground=self.COLORS['text_primary'],
                            font=self.FONTS['body'])
-        
+                           
         self.style.configure('Status.TLabel',
                            background=self.COLORS['surface'],
                            foreground=self.COLORS['text_secondary'],
                            font=self.FONTS['small'])
+
+        # ═══ RADIO BUTTONS (ARREGLADO) ═══
+        # Fondo blanco para que no se vea el recuadro "feo"
+        self.style.configure('Consulta.TRadiobutton',
+                           background=self.COLORS['surface'],
+                           foreground=self.COLORS['text_primary'],
+                           font=self.FONTS['body'],
+                           focuscolor=self.COLORS['surface'], 
+                           indicatorcolor=self.COLORS['surface'])
         
-        # ═══ BOTONES PROFESIONALES ═══
+        self.style.map('Consulta.TRadiobutton',
+                      indicatorcolor=[('selected', self.COLORS['primary'])],
+                      foreground=[('selected', self.COLORS['primary'])])
+
+        # ═══ BOTONES (MODERNOS) ═══
         self.style.configure('Primary.TButton',
                            background=self.COLORS['primary'],
                            foreground=self.COLORS['text_light'],
                            font=self.FONTS['button'],
-                           padding=(16, 8),
-                           relief='flat',
                            borderwidth=0,
                            focuscolor='none')
         
         self.style.map('Primary.TButton',
-                      background=[('active', self.COLORS['primary_light']),
-                                ('pressed', self.COLORS['primary_dark']),
-                                ('disabled', '#BDBDBD')])
+                      background=[('active', self.COLORS['primary_dark']), 
+                                ('pressed', self.COLORS['primary_dark'])])
         
         self.style.configure('Secondary.TButton',
-                           background=self.COLORS['text_secondary'],
+                           background=self.COLORS['secondary'],
                            foreground=self.COLORS['text_light'],
                            font=self.FONTS['button'],
-                           padding=(12, 6),
-                           relief='flat',
                            borderwidth=0,
                            focuscolor='none')
-        
+                           
+        self.style.map('Secondary.TButton',
+                      background=[('active', '#475569')])
+
         self.style.configure('Success.TButton',
                            background=self.COLORS['success'],
                            foreground=self.COLORS['text_light'],
                            font=self.FONTS['button'],
-                           padding=(12, 6),
-                           relief='flat',
-                           borderwidth=0,
-                           focuscolor='none')
-        
-        # ═══ PROGRESS BAR ═══
+                           borderwidth=0)
+
+        # ═══ BARRA DE PROGRESO ═══
         self.style.configure('Compact.Horizontal.TProgressbar',
                            background=self.COLORS['primary'],
                            troughcolor=self.COLORS['border'],
-                           thickness=20,
-                           lightcolor=self.COLORS['primary_light'],
-                           darkcolor=self.COLORS['primary_dark'])
+                           thickness=15,
+                           borderwidth=0)
+        # ═══ SCROLLBAR MODERNIZADO (Adiós barra gris vieja) ═══
+        self.style.configure('Vertical.TScrollbar',
+                           background='#CBD5E1',        # Color normal (Gris suave, no intrusivo)
+                           troughcolor='#F8FAFC',       # Color del carril (Casi blanco, invisible)
+                           bordercolor='#F8FAFC',       # Sin bordes feos
+                           arrowcolor=self.COLORS['primary'], # Flechitas en Verde Corporativo
+                           relief='flat')               # Totalmente plano
         
-        # ═══ LABELFRAMES ═══
-        self.style.configure('Card.TLabelframe',
-                           background=self.COLORS['surface'],
-                           borderwidth=1,
-                           relief='solid')
+        # Efecto Hover: Se pone Verde cuando pasas el mouse
+        self.style.map('Vertical.TScrollbar',
+                      background=[('active', self.COLORS['primary']), 
+                                ('pressed', self.COLORS['primary_dark'])],
+                      arrowcolor=[('active', self.COLORS['primary_dark'])])
         
-        self.style.configure('Card.TLabelframe.Label',
-                           background=self.COLORS['surface'],
-                           foreground=self.COLORS['primary'],
-                           font=self.FONTS['subtitle'])
-    
     def create_dual_ui(self):
         """Crea la interfaz dual con selector de tipo de consulta"""
         
@@ -1014,64 +1030,61 @@ class ConsultaRUTApp(tk.Tk):
         
         # ═══ CONTENIDO PRINCIPAL CON SELECTOR DUAL ═══
         self.create_main_dual_grid()
-    
     def create_compact_header(self):
-        """Header compacto con logo"""
+        """Header limpio y moderno (CORREGIDO: Logo con fondo blanco)"""
         header_frame = ttk.Frame(self, style='Header.TFrame', padding="25 18")
         header_frame.pack(fill=tk.X)
         
         header_frame.columnconfigure(1, weight=1)
         header_frame.rowconfigure(0, weight=1)
         
-        # ═══ CONTENEDOR DEL LOGO ═══
+        # ═══ 1. LOGO (Izquierda) ═══
         logo_container = ttk.Frame(header_frame, style='Header.TFrame')
         logo_container.grid(row=0, column=0, sticky="nsw", padx=(0, 30), pady=8)
         
+        # Intentamos cargar logo
         logo = self.load_and_resize_logo(max_width=350, max_height=90)
         
         if logo:
             self.logo_image = logo
-            logo_frame = ttk.Frame(logo_container, style='Header.TFrame', padding=8)
+            # Frame contenedor blanco
+            logo_frame = ttk.Frame(logo_container, style='Header.TFrame', padding=0)
             logo_frame.pack()
+            
             logo_label = ttk.Label(logo_frame, 
                                  image=self.logo_image,
-                                 style='HeaderTitle.TLabel')
+                                 style='Body.TLabel') 
             logo_label.pack()
         else:
+            # Texto de respaldo
             logo_text_frame = ttk.Frame(logo_container, style='Header.TFrame', padding=10)
             logo_text_frame.pack()
             logo_text = ttk.Label(logo_text_frame,
                                 text="🏢 A.S. CONTADORES &\nASESORES SAS",
-                                font=('Arial', 16, 'bold'),
-                                background=self.COLORS['primary'],
-                                foreground=self.COLORS['text_light'],
+                                style='HeaderTitle.TLabel',
                                 justify=tk.CENTER)
             logo_text.pack()
         
-        # ═══ INFORMACIÓN CORPORATIVA ═══
+        # ═══ 2. TÍTULOS (Derecha) ═══
         info_container = ttk.Frame(header_frame, style='Header.TFrame')
         info_container.grid(row=0, column=1, sticky="ew", pady=10)
         
         main_title = ttk.Label(info_container,
                               text="Gestión Masiva DIAN",
-                              font=('Arial', 22, 'bold'),
-                              background=self.COLORS['primary'],
-                              foreground=self.COLORS['text_light'])
+                              style='HeaderTitle.TLabel')
         main_title.pack(anchor="w", pady=(0, 4))
         
         subtitle = ttk.Label(info_container,
                            text="Sistema automatizado de consulta Express",
-                           font=('Arial', 12),
-                           background=self.COLORS['primary'],
-                           foreground=self.COLORS['text_light'])
+                           style='HeaderSub.TLabel')
         subtitle.pack(anchor="w", pady=(0, 3))
         
-        services_line = ttk.Label(info_container,
-                                text="Asesoría Contable • Financiera • Tributaria • Revisoría Fiscal",
-                                font=('Arial', 10),
-                                background=self.COLORS['primary'],
-                                foreground=self.COLORS['accent'])
-        services_line.pack(anchor="w")
+        services_label = ttk.Label(info_container,
+                                 text="Asesoría Contable • Financiera • Tributaria • Revisoría Fiscal",
+                                 font=self.FONTS['small'],
+                                 background=self.COLORS['surface'],
+                                 foreground=self.COLORS['accent'])
+        services_label.pack(anchor="w")
     
     def create_main_dual_grid(self):
         """Crear contenido principal con selector dual"""
@@ -1190,28 +1203,31 @@ class ConsultaRUTApp(tk.Tk):
         self.label_errores.pack(anchor="w")
         
         # ═══ COLUMNA DERECHA: RESULTADOS ═══
+        # ═══ COLUMNA DERECHA: RESULTADOS (MEJORADA) ═══
         results_frame = ttk.LabelFrame(main_container,
-                                     text="📋 Resultados",
+                                     text="📋 Resultados del Proceso", 
                                      style='Card.TLabelframe',
-                                     padding="8")
+                                     padding="1") # Padding fino y elegante
         results_frame.grid(row=2, column=1, sticky="nsew", padx=(5, 0))
         
-        text_container = ttk.Frame(results_frame, style='Main.TFrame')
-        text_container.pack(fill=tk.BOTH, expand=True)
+        # Frame interno para dar margen
+        text_container = ttk.Frame(results_frame, style='Main.TFrame', padding=1)
+        text_container.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
         scrollbar = ttk.Scrollbar(text_container)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         
+        # 🔴 AQUÍ CAMBIA: Fuente moderna y fondo gris pálido
         self.text_resultados = tk.Text(text_container,
                                      wrap=tk.WORD,
                                      height=9,
                                      yscrollcommand=scrollbar.set,
-                                     bg=self.COLORS['surface'],
+                                     bg='#F8FAFC',            # Gris casi blanco (muy elegante)
                                      fg=self.COLORS['text_primary'],
-                                     font=self.FONTS['small'],
-                                     padx=8,
-                                     pady=8,
-                                     relief='flat',
+                                     font=('Segoe UI', 9),    # FUENTE MODERNA (Adiós letra de consola)
+                                     padx=10,                 # Más espacio interno para leer mejor
+                                     pady=10,
+                                     relief='flat',           # Sin bordes 3D
                                      borderwidth=0)
         self.text_resultados.pack(fill=tk.BOTH, expand=True)
         scrollbar.config(command=self.text_resultados.yview)
@@ -1241,7 +1257,7 @@ class ConsultaRUTApp(tk.Tk):
         footer_frame.pack(fill=tk.X, side=tk.BOTTOM)
         
         footer_text = ttk.Label(footer_frame,
-                              text="© 2026 A.S. Contadores & Asesores SAS | V4.4 CG",
+                              text="© 2026 A.S. Contadores & Asesores SAS | V4.5 CG",
                               style='Status.TLabel')
         footer_text.pack()
     
