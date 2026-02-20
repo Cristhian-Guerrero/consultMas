@@ -1257,7 +1257,7 @@ class ConsultaRUTApp(tk.Tk):
         footer_frame.pack(fill=tk.X, side=tk.BOTTOM)
         
         footer_text = ttk.Label(footer_frame,
-                              text="© 2026 A.S. Contadores & Asesores SAS | V4.5 CG",
+                              text="© 2026 A.S. Contadores & Asesores SAS | V4.6 CG",
                               style='Status.TLabel')
         footer_text.pack()
     
