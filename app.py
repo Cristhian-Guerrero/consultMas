@@ -1558,31 +1558,32 @@ class ConsultaRUTApp(tk.Tk):
                     if tipo_seleccionado == "basica":
                         fila_excel = {
                             "NIT": nit,
-                            "DV": "Error",
-                            "Primer Apellido": "Error en consulta",
-                            "Segundo Apellido": "Error en consulta", 
-                            "Primer Nombre": "Error en consulta",
-                            "Otros Nombres": "Error en consulta",
-                            "Razón Social": "Error en consulta",
+                            "DV": "-",
+                            "Primer Apellido": "-",
+                            "Segundo Apellido": "-", 
+                            "Primer Nombre": "-",
+                            "Otros Nombres": "-",
+                            "Razón Social": "-",
                             "Fecha Consulta": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                            "Estado Consulta": "Error",
+                            "Estado Consulta": "No Inscrito",
                             "Tipo de Consulta": "Express",
-                            "Observaciones": error_msg
-                        }
+                            "Observaciones": "No Inscrito" 
+                            }
+                    
                     else:
                         fila_excel = {
                             "NIT": nit,
-                            "DV": "Error",
-                            "Primer Apellido": "Error en consulta",
-                            "Segundo Apellido": "Error en consulta", 
-                            "Primer Nombre": "Error en consulta",
-                            "Otros Nombres": "Error en consulta",
-                            "Razón Social": "Error en consulta",
-                            "Estado del Registro": "ERROR",
+                            "DV": "-",
+                            "Primer Apellido": "-",
+                            "Segundo Apellido": "-", 
+                            "Primer Nombre": "-",
+                            "Otros Nombres": "-",
+                            "Razón Social": "-",
+                            "Estado del Registro": "-",
                             "Fecha Consulta": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                            "Estado Consulta": "Error",
+                            "Estado Consulta": "No Inscrito",
                             "Tipo de Consulta": "RUT Detallado",
-                            "Observaciones": error_msg
+                            "Observaciones": "No Inscrito"
                         }
                     
                     self.rows_for_excel.append(fila_excel)
@@ -1699,14 +1700,14 @@ class ConsultaRUTApp(tk.Tk):
                 title_format = workbook.add_format({
                     'bold': True, 'font_size': 16, 'font_color': '#D63384',
                     'align': 'center', 'valign': 'vcenter', 'bg_color': '#FDF2F8',
-                    'font_name': 'Arial'
+                    'font_name': 'Calibri'
                 })
                 titulo = f'[PARCIAL - Express] Consulta DIAN Profesional - A.S. Contadores & Asesores SAS - {datetime.now().strftime("%d/%m/%Y %H:%M")}'
             else:
                 title_format = workbook.add_format({
                     'bold': True, 'font_size': 16, 'font_color': '#1565C0',
                     'align': 'center', 'valign': 'vcenter', 'bg_color': '#E3F2FD',
-                    'font_name': 'Arial'
+                    'font_name': 'Calibri'
                 })
                 titulo = f'[PARCIAL - RUT DETALLADO] Consulta DIAN Profesional - A.S. Contadores & Asesores SAS - {datetime.now().strftime("%d/%m/%Y %H:%M")}'
         else:
@@ -1714,14 +1715,14 @@ class ConsultaRUTApp(tk.Tk):
                 title_format = workbook.add_format({
                     'bold': True, 'font_size': 16, 'font_color': '#1B5E20',
                     'align': 'center', 'valign': 'vcenter', 'bg_color': '#E8F5E9',
-                    'font_name': 'Arial'
+                    'font_name': 'Calibri'
                 })
                 titulo = f'Consulta Gestión Masiva DIAN Express- A.S. Contadores & Asesores SAS - {datetime.now().strftime("%d/%m/%Y %H:%M")}'
             else:
                 title_format = workbook.add_format({
                     'bold': True, 'font_size': 16, 'font_color': '#0D47A1',
                     'align': 'center', 'valign': 'vcenter', 'bg_color': '#E1F5FE',
-                    'font_name': 'Arial'
+                    'font_name': 'Calibri'
                 })
                 titulo = f'Consulta Gestión Masiva DIAN RUT DETALLADO - A.S. Contadores & Asesores SAS - {datetime.now().strftime("%d/%m/%Y %H:%M")}'
         
@@ -1730,36 +1731,51 @@ class ConsultaRUTApp(tk.Tk):
             header_format = workbook.add_format({
                 'bold': True, 'text_wrap': True, 'valign': 'vcenter', 'align': 'center',
                 'fg_color': '#1B5E20', 'font_color': 'white', 'border': 2,
-                'border_color': '#2E7D32', 'font_size': 11, 'font_name': 'Arial'
+                'border_color': '#2E7D32', 'font_size': 11, 'font_name': 'Calibri'
             })
         else:
             header_format = workbook.add_format({
                 'bold': True, 'text_wrap': True, 'valign': 'vcenter', 'align': 'center',
                 'fg_color': '#0D47A1', 'font_color': 'white', 'border': 2,
-                'border_color': '#1976D2', 'font_size': 11, 'font_name': 'Arial'
+                'border_color': '#1976D2', 'font_size': 11, 'font_name': 'Calibri'
             })
         
         # Formatos de datos
         num_format = workbook.add_format({
             'num_format': '0', 'align': 'center', 'valign': 'vcenter',
-            'border': 1, 'border_color': '#E8F5E9', 'font_size': 10, 'font_name': 'Arial'
+            'border': 1, 'border_color': '#9E9E9E', 'font_size': 10,
+            'font_name': 'Calibri', 'bg_color': '#FFFFFF'
         })
         
         text_format = workbook.add_format({
-            'text_wrap': True, 'valign': 'vcenter', 'border': 1,
-            'border_color': '#E8F5E9', 'font_size': 10, 'font_name': 'Arial'
+            'valign': 'vcenter', 'border': 1, 'border_color': '#9E9E9E',
+            'font_size': 10, 'font_name': 'Calibri', 'bg_color': '#FFFFFF'
+        })
+        text_format_par = workbook.add_format({
+            'valign': 'vcenter', 'border': 1, 'border_color': '#9E9E9E',
+            'font_size': 10, 'font_name': 'Calibri', 'bg_color': '#EAF4EA'
+        })
+        num_format_par = workbook.add_format({
+            'num_format': '0', 'align': 'center', 'valign': 'vcenter',
+            'border': 1, 'border_color': '#9E9E9E', 'font_size': 10,
+            'font_name': 'Calibri', 'bg_color': '#EAF4EA'
         })
         
         success_format = workbook.add_format({
             'align': 'center', 'valign': 'vcenter', 'border': 1,
-            'border_color': '#E8F5E9', 'bg_color': '#C8E6C9',
-            'font_color': '#1B5E20', 'bold': True, 'font_size': 10, 'font_name': 'Arial'
+            'border_color': '#145214', 'bg_color': '#1B5E20',
+            'font_color': '#FFFFFF', 'bold': True, 'font_size': 10, 'font_name': 'Calibri'
         })
         
         error_format = workbook.add_format({
             'align': 'center', 'valign': 'vcenter', 'border': 1,
-            'border_color': '#E8F5E9', 'bg_color': '#FFCDD2',
-            'font_color': '#C62828', 'bold': True, 'font_size': 10, 'font_name': 'Arial'
+            'border_color': '#7B1212', 'bg_color': '#B71C1C',
+            'font_color': '#FFFFFF', 'bold': True, 'font_size': 10, 'font_name': 'Calibri'
+        })
+        no_inscrito_format = workbook.add_format({
+            'align': 'center', 'valign': 'vcenter', 'border': 1,
+            'border_color': '#BF360C', 'bg_color': '#E65100',
+            'font_color': '#FFFFFF', 'bold': True, 'font_size': 10, 'font_name': 'Calibri'
         })
         
         # Formato especial para Estado del Registro (solo RUT)
@@ -1767,13 +1783,13 @@ class ConsultaRUTApp(tk.Tk):
             estado_activo_format = workbook.add_format({
                 'align': 'center', 'valign': 'vcenter', 'border': 1,
                 'border_color': '#E1F5FE', 'bg_color': '#B3E5FC',
-                'font_color': '#0D47A1', 'bold': True, 'font_size': 10, 'font_name': 'Arial'
+                'font_color': '#0D47A1', 'bold': True, 'font_size': 10, 'font_name': 'Calibri'
             })
             
             estado_inactivo_format = workbook.add_format({
                 'align': 'center', 'valign': 'vcenter', 'border': 1,
                 'border_color': '#E1F5FE', 'bg_color': '#FFECB3',
-                'font_color': '#E65100', 'bold': True, 'font_size': 10, 'font_name': 'Arial'
+                'font_color': '#E65100', 'bold': True, 'font_size': 10, 'font_name': 'Calibri'
             })
         
         # Escribir título
@@ -1783,17 +1799,17 @@ class ConsultaRUTApp(tk.Tk):
         # Configurar anchos optimizados según tipo de consulta
         if tipo_consulta == "basica":
             column_widths = {
-                'NIT': 18, 'DV': 6, 'Primer Apellido': 20, 'Segundo Apellido': 20,
-                'Primer Nombre': 20, 'Otros Nombres': 15, 'Razón Social': 45,
-                'Fecha Consulta': 20, 'Estado Consulta': 15, 'Tipo de Consulta': 15,
-                'Observaciones': 40
+                'NIT': 15, 'DV': 5, 'Primer Apellido': 20, 'Segundo Apellido': 20,
+                'Primer Nombre': 20, 'Otros Nombres': 16, 'Razón Social': 38,
+                'Fecha Consulta': 19, 'Estado Consulta': 14, 'Tipo de Consulta': 10,
+                'Observaciones': 22
             }
         else:
             column_widths = {
-                'NIT': 18, 'DV': 6, 'Primer Apellido': 20, 'Segundo Apellido': 20,
-                'Primer Nombre': 20, 'Otros Nombres': 15, 'Razón Social': 30,
-                'Estado del Registro': 25, 'Fecha Consulta': 20, 'Estado Consulta': 15,
-                'Tipo de Consulta': 15, 'Observaciones': 40
+                'NIT': 15, 'DV': 5, 'Primer Apellido': 20, 'Segundo Apellido': 20,
+                'Primer Nombre': 20, 'Otros Nombres': 16, 'Razón Social': 32,
+                'Estado del Registro': 22, 'Fecha Consulta': 19, 'Estado Consulta': 14,
+                'Tipo de Consulta': 10, 'Observaciones': 22
             }
         
         for i, col_name in enumerate(df_out.columns):
@@ -1804,39 +1820,44 @@ class ConsultaRUTApp(tk.Tk):
         for col_num, col_name in enumerate(df_out.columns):
             worksheet.write(2, col_num, col_name, header_format)
         
-        # Datos
+        # Datos con filas alternas
         for row_num in range(len(df_out)):
+            es_par = (row_num % 2 == 0)
+            tf = text_format_par if es_par else text_format
+            nf = num_format_par  if es_par else num_format
+
             for col_num, col_name in enumerate(df_out.columns):
                 cell_value = df_out.iloc[row_num, col_num]
                 actual_row = row_num + 3
-                
+
                 if col_name in ['NIT', 'DV']:
-                    cell_format = num_format
+                    cell_format = nf
                 elif col_name == 'Estado Consulta':
-                    if str(cell_value).lower() == 'exitoso':
+                    val_lower = str(cell_value).lower()
+                    if val_lower == 'exitoso':
                         cell_format = success_format
                     else:
-                        cell_format = error_format
+                        cell_format = no_inscrito_format
                 elif col_name == 'Estado del Registro' and tipo_consulta == "rut_detallado":
-                    estado_val = str(cell_value).upper()        
+                    estado_val = str(cell_value).upper()
                     if 'ACTIVO' in estado_val:
                         cell_format = estado_activo_format
                     elif 'SUSPENDIDO' in estado_val:
-                        cell_format = error_format
+                        cell_format = no_inscrito_format
                     elif 'ERROR' in estado_val or 'SIN' in estado_val:
                         cell_format = estado_inactivo_format
                     else:
-                        cell_format = text_format
+                        cell_format = tf
                 else:
-                    cell_format = text_format
-                
+                    cell_format = tf
+
                 worksheet.write(actual_row, col_num, cell_value, cell_format)
-        
+
         # Configuraciones finales
         worksheet.freeze_panes(3, 0)
         worksheet.autofilter(2, 0, len(df_out) + 2, len(df_out.columns) - 1)
-        worksheet.set_default_row(22)
-        worksheet.set_row(2, 28)
+        worksheet.set_default_row(18)
+        worksheet.set_row(2, 32)
         worksheet.set_landscape()
         worksheet.fit_to_pages(1, 0)
     
