@@ -2,8 +2,11 @@
 Lógica de scraping DIAN — Consulta Express y RUT Detallado.
 """
 
+import logging
 import time
 from datetime import datetime
+
+log = logging.getLogger(__name__)
 from config import (
     DIAN_URL_BASICA, SEL_NIT_ID_BASICA, SEL_DV_ID_BASICA, BTN_BUSCAR_ID_BASICA,
     FIELDS_BASICA, DIAN_URL_RUT, FIELDS_RUT, ERROR_CSS, TimeoutConfig
@@ -25,7 +28,7 @@ def set_field_js(driver, element_id, value):
         """
         return driver.run_js(js) == value
     except Exception as e:
-        print(f"Error set_field_js {element_id}: {e}")
+        log.warning(f"set_field_js {element_id}: {e}")
         return False
 
 
@@ -39,7 +42,7 @@ def click_js(driver, element_id):
         """
         return driver.run_js(js)
     except Exception as e:
-        print(f"Error click_js {element_id}: {e}")
+        log.warning(f"click_js {element_id}: {e}")
         return False
 
 
@@ -56,7 +59,7 @@ def calcular_dv(nit: str) -> str:
             return "1"
         return str(dv_val)
     except Exception as e:
-        print(f"Error calculando DV para NIT {nit}: {e}")
+        log.warning(f"calcular_dv NIT {nit}: {e}")
         return "0"
 
 
@@ -144,7 +147,7 @@ def consultar_nit_basica(nit: str, attempt: int = 1):
             CloudflareBypasser(driver, max_retries=2, log=False).bypass()
             time.sleep(TimeoutConfig.CF_BYPASS_WAIT)
         except Exception as e:
-            print(f"Warning Cloudflare: {e}")
+            log.debug(f"Cloudflare bypass: {e}")
 
         for i in range(2):
             if _reset_basica(driver):
@@ -214,7 +217,7 @@ def consultar_nit_basica(nit: str, attempt: int = 1):
         return {"status": "success", "data": data, "error": None}
 
     except Exception as e:
-        print(f"❌ Error consulta Express {nit}: {e}")
+        log.warning(f"Error consulta Express {nit}: {e}")
         return {"status": "error", "data": {}, "error": str(e)}
     finally:
         if driver:
@@ -233,7 +236,7 @@ def _set_nit_rut(driver, nit):
         """
         return driver.run_js(js) == nit
     except Exception as e:
-        print(f"Error set_nit_rut: {e}")
+        log.warning(f"set_nit_rut: {e}")
         return False
 
 
@@ -390,7 +393,7 @@ def consultar_nit_rut_detallado(nit: str, attempt: int = 1):
         return {"status": "success", "data": data, "error": None}
 
     except Exception as e:
-        print(f"❌ Error RUT {nit}: {e}")
+        log.warning(f"Error RUT {nit}: {e}")
         return {"status": "error", "data": {}, "error": str(e)}
     finally:
         if driver:

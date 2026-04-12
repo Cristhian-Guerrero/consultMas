@@ -3,6 +3,7 @@ Configuración central — URLs, selectores, timeouts, mensajes.
 """
 
 import os
+import threading
 
 # ─────── URLs y selectores Express ───────
 DIAN_URL_BASICA = os.getenv(
@@ -36,17 +37,19 @@ ERROR_CSS = ".ui-messages-error-detail"
 
 # ─────── Timeouts ───────
 class TimeoutConfig:
-    INITIAL_WAIT      = 0.7
-    POST_NIT_WAIT     = 0.5
-    RESULTS_WAIT      = 2.0
-    CF_BYPASS_WAIT    = 0.5
+    # Express
+    INITIAL_WAIT      = 0.7   # espera inicial tras cargar página
+    POST_NIT_WAIT     = 0.5   # pausa tras ingresar NIT
+    RESULTS_WAIT      = 2.0   # tiempo máximo esperando resultados
+    CF_BYPASS_WAIT    = 0.5   # pausa tras bypass Cloudflare
+    # RUT Detallado (portal diferente, más lento)
     INITIAL_WAIT_RUT  = 1
     POST_NIT_WAIT_RUT = 2
-    RESULTS_WAIT_RUT  = 3
-    CAPTCHA_WAIT      = 0
+    RESULTS_WAIT_RUT  = 3     # en código se usa * 0.8 = 2.4s efectivos
+    # General
     MAX_RETRIES       = 2
     BACKOFF_FACTOR    = 2
-    BROWSER_REST_TIME = 0.2
+    BROWSER_REST_TIME = 0.2   # pausa entre consultas
 
 # ─────── Pool de navegadores ───────
 MAX_POOL_SIZE = 4
@@ -97,18 +100,21 @@ TIPS_CONTABLES = [
     "🎯 Estado RUT: La consulta detallada proporciona información de registro más precisa",
 ]
 
-# Índices rotativos para mensajes
+# Índices rotativos para mensajes — protegidos con Lock (se acceden desde hilo secundario)
 _mensaje_index = 0
 _tip_index = 0
+_lock_mensajes = threading.Lock()
 
 def obtener_mensaje_profesional():
     global _mensaje_index
-    msg = MENSAJES_PROFESIONALES[_mensaje_index % len(MENSAJES_PROFESIONALES)]
-    _mensaje_index += 1
+    with _lock_mensajes:
+        msg = MENSAJES_PROFESIONALES[_mensaje_index % len(MENSAJES_PROFESIONALES)]
+        _mensaje_index += 1
     return msg
 
 def obtener_tip_contable():
     global _tip_index
-    tip = TIPS_CONTABLES[_tip_index % len(TIPS_CONTABLES)]
-    _tip_index += 1
+    with _lock_mensajes:
+        tip = TIPS_CONTABLES[_tip_index % len(TIPS_CONTABLES)]
+        _tip_index += 1
     return tip

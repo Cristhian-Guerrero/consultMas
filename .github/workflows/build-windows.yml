@@ -42,6 +42,7 @@ jobs:
             --name="ConsultaDIAN" `
             --windowed `
             --onefile `
+            --version-file="version_info.txt" `
             --add-data="logo.png;." `
             --add-data="dian.ico;." `
             --hidden-import=DrissionPage `

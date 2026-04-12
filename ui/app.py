@@ -23,7 +23,7 @@ from core.excel import apply_formatting
 
 class ConsultaRUTApp(tk.Tk):
 
-    VERSION = "V4.7 CG"
+    VERSION = "V4.8 CG"
 
     COLORS = {
         'primary':        "#166534",
@@ -403,12 +403,17 @@ class ConsultaRUTApp(tk.Tk):
         try:
             nits_raw = df["NIT"].dropna().astype(str).tolist()
             nits_procesados = []
+            invalidos = 0
             for nit in nits_raw:
                 if '.' in nit:
                     nit = str(int(float(nit)))
                 nit_limpio = ''.join(c for c in nit if c.isdigit())
-                if nit_limpio:
+                if nit_limpio and 5 <= len(nit_limpio) <= 15:
                     nits_procesados.append(nit_limpio)
+                elif nit_limpio:
+                    invalidos += 1
+            if invalidos:
+                self._add_msg(f"⚠️ {invalidos} NIT(s) omitidos por longitud inválida (debe ser 5–15 dígitos)", "WARNING")
 
             nits_unicos = list(dict.fromkeys(nits_procesados))
             duplicados  = len(nits_procesados) - len(nits_unicos)
