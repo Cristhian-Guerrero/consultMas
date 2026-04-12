@@ -821,6 +821,7 @@ class ConsultaRUTApp(tk.Tk):
         self.rows_for_excel = []
         self.tiempo_inicio = None
         self.cronometro_activo = False
+        self.conservar_duplicados = tk.BooleanVar(value=False)
     
     def center_window(self):
         """Centra la ventana en la pantalla"""
@@ -1147,7 +1148,30 @@ class ConsultaRUTApp(tk.Tk):
                                     style='Secondary.TButton',
                                     state=tk.DISABLED)
         self.btn_detener.pack(side=tk.LEFT, padx=(0, 10))
-        
+
+        # ═══ TOGGLE DUPLICADOS ═══
+        # Separador visual
+        sep_frame = ttk.Frame(buttons_container, style='Main.TFrame', width=1)
+        sep_frame.pack(side=tk.LEFT, fill=tk.Y, padx=(5, 10))
+        sep_line = tk.Frame(buttons_container, bg=self.COLORS['border'], width=1, height=28)
+        sep_line.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 10))
+
+        self.btn_duplicados = tk.Button(
+            buttons_container,
+            text="◈  Duplicados: OFF",
+            font=('Segoe UI', 9),
+            relief='flat',
+            cursor='hand2',
+            bg=self.COLORS['border'],
+            fg=self.COLORS['text_secondary'],
+            padx=12,
+            pady=5,
+            bd=0,
+            activebackground=self.COLORS['border'],
+            command=self._on_toggle_duplicados
+        )
+        self.btn_duplicados.pack(side=tk.LEFT, padx=(0, 10))
+
         self.btn_open_excel = ttk.Button(buttons_container,
                                        text="📊 Abrir Excel",
                                        command=self.open_excel,
@@ -1257,7 +1281,7 @@ class ConsultaRUTApp(tk.Tk):
         footer_frame.pack(fill=tk.X, side=tk.BOTTOM)
         
         footer_text = ttk.Label(footer_frame,
-                              text="© 2026 A.S. Contadores & Asesores SAS | V4.6 CG",
+                              text="© 2026 A.S. Contadores & Asesores SAS | V4.7 CG",
                               style='Status.TLabel')
         footer_text.pack()
     
@@ -1270,7 +1294,27 @@ class ConsultaRUTApp(tk.Tk):
         else:
             self.label_tipo_activo.config(text="🔍 Consulta Detallada RUT seleccionada (Completa)")
             self.add_result_message("🔍 Modo Detallado: Consulta completa con estado del registro", "INFO")
-    
+
+    def _on_toggle_duplicados(self):
+        """Alterna la opción de conservar duplicados con cambio visual"""
+        self.conservar_duplicados.set(not self.conservar_duplicados.get())
+        if self.conservar_duplicados.get():
+            self.btn_duplicados.config(
+                text="◈  Duplicados: ON",
+                bg='#B45309',
+                fg='white',
+                activebackground='#92400E'
+            )
+            self.add_result_message("◈ Duplicados activados — se procesará cada NIT por separado", "WARNING")
+        else:
+            self.btn_duplicados.config(
+                text="◈  Duplicados: OFF",
+                bg=self.COLORS['border'],
+                fg=self.COLORS['text_secondary'],
+                activebackground=self.COLORS['border']
+            )
+            self.add_result_message("◈ Duplicados desactivados — se eliminarán NITs repetidos", "INFO")
+
     def update_stats(self, total, exitosos, errores):
         """Actualiza las estadísticas en tiempo real"""
         self.label_total.config(text=f"Total: {total}")
@@ -1366,20 +1410,37 @@ class ConsultaRUTApp(tk.Tk):
                 if nit_limpio and len(nit_limpio) >= 1:
                     nits_procesados.append(nit_limpio)
             
-            self.lista_nits = list(dict.fromkeys(nits_procesados))
-            
+            # Deduplicación condicional según el toggle
+            nits_unicos = list(dict.fromkeys(nits_procesados))
+            duplicados_encontrados = len(nits_procesados) - len(nits_unicos)
+
+            if self.conservar_duplicados.get():
+                self.lista_nits = nits_procesados
+                if duplicados_encontrados > 0:
+                    self.add_result_message(
+                        f"◈ Duplicados conservados: {duplicados_encontrados} NITs repetidos se procesarán individualmente",
+                        "WARNING"
+                    )
+            else:
+                self.lista_nits = nits_unicos
+                if duplicados_encontrados > 0:
+                    self.add_result_message(
+                        f"◈ Duplicados eliminados: {duplicados_encontrados} NITs repetidos fueron removidos",
+                        "INFO"
+                    )
+
             if not self.lista_nits:
                 self.add_result_message("No hay NITs válidos", "ERROR")
                 return
-            
+
             total = len(self.lista_nits)
             self.progress_bar["maximum"] = total
             self.progress_bar["value"] = 0
             self.update_stats(total, 0, 0)
-            
+
             tipo = self.tipo_consulta.get()
             tipo_texto = "Express" if tipo == "basica" else "Detallada RUT"
-            
+
             self.label_status.config(text=f"Iniciando consulta {tipo_texto}: {total} NITs")
             self.add_result_message(f"Procesando {total} NITs - Tipo: {tipo_texto}", "SUCCESS")
             self.add_result_message("═══ INICIANDO PROCESAMIENTO ═══", "INFO")
@@ -1495,10 +1556,10 @@ class ConsultaRUTApp(tk.Tk):
                         fila_excel = {
                             "NIT": nit,
                             "DV": data.get("dv", calcular_dv(nit)),
-                            "Primer Apellido": limpiar_campo(data.get("primerNombre", "")),
-                            "Segundo Apellido": limpiar_campo(data.get("otrosNombres", "")),
-                            "Primer Nombre": limpiar_campo(data.get("primerApellido", "")),
-                            "Otros Nombres": limpiar_campo(data.get("segundoApellido", "")),
+                            "Primer Apellido": limpiar_campo(data.get("primerApellido", "")),
+                            "Segundo Apellido": limpiar_campo(data.get("segundoApellido", "")),
+                            "Primer Nombre": limpiar_campo(data.get("primerNombre", "")),
+                            "Otros Nombres": limpiar_campo(data.get("otrosNombres", "")),
                             "Razón Social": limpiar_campo(data.get("razonSocial", "")),
                             "Fecha Consulta": data.get("datetime", ""),
                             "Estado Consulta": "Exitoso",
@@ -1627,9 +1688,12 @@ class ConsultaRUTApp(tk.Tk):
             if not self.rows_for_excel:
                 self.add_result_message("No hay datos para Excel", "WARNING")
                 return
-            
+
             df_out = pd.DataFrame(self.rows_for_excel)
-            
+
+            # Rellenar celdas vacías/NaN para que no queden en blanco en el Excel
+            df_out = df_out.fillna("-")
+
             if 'NIT' in df_out.columns:
                 df_out['NIT'] = pd.to_numeric(df_out['NIT'], errors='coerce').fillna(0).astype('int64')
             if 'DV' in df_out.columns:
@@ -1663,9 +1727,12 @@ class ConsultaRUTApp(tk.Tk):
             if not self.rows_for_excel:
                 self.add_result_message("No hay datos", "WARNING")
                 return
-            
+
             df_out = pd.DataFrame(self.rows_for_excel)
-            
+
+            # Rellenar celdas vacías/NaN para que no queden en blanco en el Excel
+            df_out = df_out.fillna("-")
+
             if 'NIT' in df_out.columns:
                 df_out['NIT'] = pd.to_numeric(df_out['NIT'], errors='coerce').fillna(0).astype('int64')
             if 'DV' in df_out.columns:
