@@ -2,7 +2,7 @@ name: Build Windows Executable
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main, master, refactor/modular-structure ]
     tags: [ 'v*' ]
   pull_request:
     branches: [ main, master ]
@@ -50,9 +50,14 @@ jobs:
             --hidden-import=xlsxwriter `
             --hidden-import=PIL `
             --hidden-import=pygetwindow `
+            --hidden-import=config `
+            --hidden-import=core.browser `
+            --hidden-import=core.scraper `
+            --hidden-import=core.excel `
+            --hidden-import=ui.app `
             --collect-all DrissionPage `
             --collect-all pandas `
-            app.py
+            main.py
 
       - name: Verify build output
         shell: powershell
