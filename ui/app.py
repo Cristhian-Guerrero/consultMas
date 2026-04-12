@@ -64,6 +64,10 @@ class ConsultaRUTApp(tk.Tk):
         self.tiempo_inicio  = None
         self.cronometro_activo = False
 
+        # Caché de resultados — evita consultar el mismo NIT más de una vez por sesión
+        self._cache_exitosos = {}   # nit → resultado completo
+        self._cache_errores  = set()  # nits que fallaron definitivamente
+
         self.geometry("1000x650")
         self.minsize(950, 630)
         self.resizable(True, False)
@@ -310,7 +314,7 @@ class ConsultaRUTApp(tk.Tk):
         if self.conservar_duplicados.get():
             self.btn_duplicados.config(text="◈  Duplicados: ON",
                                        bg=C['warning'], fg='white', activebackground='#92400E')
-            self._add_msg("◈ Duplicados activados — se procesará cada NIT por separado", "WARNING")
+            self._add_msg("◈ Duplicados activados — aparecen en Excel, DIAN se consulta una sola vez ⚡", "WARNING")
         else:
             self.btn_duplicados.config(text="◈  Duplicados: OFF",
                                        bg=C['border'], fg=C['text_secondary'], activebackground=C['border'])
@@ -364,6 +368,8 @@ class ConsultaRUTApp(tk.Tk):
 
     def _reset(self):
         cerrar_todos()
+        self._cache_exitosos = {}
+        self._cache_errores  = set()
         self.lista_nits = []
         self.rows_for_excel = []
         self.progress_bar["value"] = 0
@@ -489,14 +495,27 @@ class ConsultaRUTApp(tk.Tk):
 
                 self._update_progress(i, total, nit)
 
-                resultado = consultar_nit(nit, tipo, attempt=1)
-                if resultado.get("status") == "retry":
-                    self._add_msg(f"🔄 Reintentando NIT {nit}", "WARNING")
-                    time.sleep(1.0 if tipo == "basica" else 2.5)
-                    resultado = consultar_nit(nit, tipo, attempt=2)
-                if resultado.get("status") == "retry":
-                    time.sleep(1.5 if tipo == "basica" else 3.5)
-                    resultado = consultar_nit(nit, tipo, attempt=3)
+                es_cache_hit = False
+                if nit in self._cache_exitosos:
+                    resultado = self._cache_exitosos[nit]
+                    es_cache_hit = True
+                elif nit in self._cache_errores:
+                    resultado = {"status": "error", "data": {}, "error": "Sin datos (resultado previo)"}
+                    es_cache_hit = True
+                else:
+                    resultado = consultar_nit(nit, tipo, attempt=1)
+                    if resultado.get("status") == "retry":
+                        self._add_msg(f"🔄 Reintentando NIT {nit}", "WARNING")
+                        time.sleep(1.0 if tipo == "basica" else 2.5)
+                        resultado = consultar_nit(nit, tipo, attempt=2)
+                    if resultado.get("status") == "retry":
+                        time.sleep(1.5 if tipo == "basica" else 3.5)
+                        resultado = consultar_nit(nit, tipo, attempt=3)
+                    # Cachear solo tras agotar reintentos
+                    if resultado.get("status") == "success":
+                        self._cache_exitosos[nit] = resultado
+                    else:
+                        self._cache_errores.add(nit)
 
                 if resultado.get("status") == "success":
                     data = resultado["data"]
@@ -542,7 +561,8 @@ class ConsultaRUTApp(tk.Tk):
                     display = razon if razon and razon != "-" else (nombre if nombre else "Sin datos")
                     if len(display) > 30:
                         display = display[:30] + "..."
-                    self._add_msg(f"{nit}: {display}", "SUCCESS")
+                    cache_tag = " ⚡" if es_cache_hit else ""
+                    self._add_msg(f"{nit}: {display}{cache_tag}", "SUCCESS")
                     exitosos += 1
 
                 else:
@@ -561,7 +581,7 @@ class ConsultaRUTApp(tk.Tk):
                     errores += 1
 
                 self._update_stats(total, exitosos, errores)
-                if i < total:
+                if i < total and not es_cache_hit:
                     time.sleep(TimeoutConfig.BROWSER_REST_TIME + (0.3 if tipo == "rut_detallado" else 0))
 
             self._add_msg("═══ PROCESO COMPLETADO ═══", "INFO")
