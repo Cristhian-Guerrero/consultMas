@@ -1,9 +1,9 @@
-# PROYECTO: consultMas V4.13
+# PROYECTO: consultMas V4.13.1
 
 **Cliente:** A.S. Contadores & Asesores SAS — Pasto, Colombia
 **Repo:** https://github.com/Cristhian-Guerrero/consultMas
 **Rama activa:** `refactor/modular-structure`
-**Última versión pusheada:** V4.13
+**Última versión pusheada:** V4.13.1
 
 > Este archivo es la fuente de verdad del proyecto — arquitectura, decisiones
 > de diseño, gotchas y estado real. Léelo primero al retomar sesión. La
@@ -84,13 +84,21 @@ V4.10 abajo), con `Observaciones = "Dato de TECNOPOS sin confirmar en DIAN
 — verificar manualmente"` para que quede explícito que no pasó por DIAN.
 
 **Solo aplica cuando `resultado_dian['status'] == 'error'`, NO cuando es
-`'retry'`** (timeout en el primer intento, ambiguo — podría resolverse
-solo con reintentar). Esto es deliberado: no reemplazar un caso que
-todavía podría salir bien por DIAN con un dato sin confirmar. Efecto
-secundario conocido y aceptado: si DIAN falla por red (no por "no
-encontrado" real) en los 3 intentos, el fallback de TECNOPOS no se activa
-porque el coordinador solo consulta TECNOPOS en `attempt == 1` — caso raro,
-documentado, no resuelto (requeriría rediseñar el mecanismo de reintentos).
+`'retry'`** (timeout ambiguo — podría resolverse solo con reintentar). Esto
+es deliberado: no reemplazar un caso que todavía podría salir bien por DIAN
+con un dato sin confirmar.
+
+**Fix V4.13.1 — bug real encontrado con NITs `123456789`/`987654321`:**
+`consultar_nit()` originalmente solo consultaba TECNOPOS en `attempt == 1`.
+Pero DIAN da `'retry'` (no `'error'`) en el intento 1 casi siempre — el
+`'error'` definitivo recién aparece en el intento 2 o 3, momento en el que
+el coordinador ya no volvía a mirar TECNOPOS, y el dato que ya se tenía se
+perdía para siempre. Confirmado en vivo: `_procesar()` terminaba mostrando
+"No Inscrito" para NITs que TECNOPOS sí tenía. Fix: TECNOPOS se consulta en
+**cada intento**, no solo el primero — es rápido (~0.5-0.7s) y los
+reintentos ya son el camino lento de por sí, así que repetirla ahí no tiene
+costo real. Validado end-to-end simulando la cascada real de `_procesar()`
+(intento 1 retry → intento 2 con fallback aplicado correctamente).
 
 ### Reintentos en TECNOPOS (V4.12.1)
 
@@ -190,6 +198,7 @@ RUT Detallado no cambió: mismas columnas de siempre, sin Email.
 - **V4.12** — Recupera Email de TECNOPOS para personas naturales, fusionado con el nombre real de DIAN (`_merge_tecnopos_email_con_dian`) — antes se descartaba todo, incluido el email, solo por la ambigüedad del nombre
 - **V4.12.1** — Reintentos automáticos en TECNOPOS (máx 3, solo ante fallas de red, backoff 0.5s/1.0s)
 - **V4.13** — TECNOPOS como último recurso cuando DIAN da error definitivo (no timeout) — razón social completa sin partir, marcada "sin confirmar" en Observaciones
+- **V4.13.1** — Fix: TECNOPOS se consulta en cada reintento, no solo el 1ro — el 'error' definitivo de DIAN casi siempre llega en el intento 2/3, y el dato de TECNOPOS se perdía si no se volvía a mirar ahí
 
 ## Pendiente / conocido sin resolver
 

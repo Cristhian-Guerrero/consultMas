@@ -644,23 +644,33 @@ def _fallback_tecnopos_sin_confirmar(nit: str, resultado_tecnopos: dict):
 def consultar_nit(nit: str, tipo: str = "basica", attempt: int = 1):
     if tipo == "rut_detallado":
         return consultar_nit_rut_detallado(nit, attempt)
-    if attempt == 1:
-        rapido = consultar_tecnopos(nit)
-        if rapido is not None:
-            if rapido.get('_es_persona'):
-                resultado_dian = consultar_nit_basica(nit, attempt)
-                if resultado_dian.get('status') == 'success':
-                    return _merge_tecnopos_email_con_dian(resultado_dian, rapido)
-                if resultado_dian.get('status') == 'error':
-                    # DIAN dio un error definitivo (no un timeout a
-                    # reintentar) — aquí es donde TECNOPOS ayuda de verdad.
-                    fallback = _fallback_tecnopos_sin_confirmar(nit, rapido)
-                    if fallback:
-                        return fallback
-                # status == 'retry' (timeout ambiguo): se deja seguir el
-                # flujo normal de reintentos de DIAN sin tocar nada, para no
-                # reemplazar por un dato sin confirmar un caso que podría
-                # resolverse bien solo con reintentar.
-                return resultado_dian
-            return rapido
+
+    # Se consulta TECNOPOS en CADA intento (no solo el 1), a propósito: la
+    # UI reintenta DIAN hasta 3 veces cuando da 'retry' (timeout ambiguo en
+    # el primer intento), y ese 'retry' se vuelve 'error' recién en el
+    # intento 2/3. Si TECNOPOS solo se consultaba en el intento 1, el dato
+    # que ya teníamos guardado se perdía para siempre al llegar al intento
+    # final — bug real detectado con NITs 123456789/987654321: DIAN daba
+    # 'retry' en el intento 1 (fallback no aplicaba) y 'error' recién en el
+    # 2/3 (donde ya no se volvía a mirar TECNOPOS). TECNOPOS es rápido
+    # (~0.5-0.7s) y los reintentos ya son el camino lento de por sí, así
+    # que repetir esta consulta ahí no tiene costo real.
+    rapido = consultar_tecnopos(nit)
+    if rapido is not None:
+        if rapido.get('_es_persona'):
+            resultado_dian = consultar_nit_basica(nit, attempt)
+            if resultado_dian.get('status') == 'success':
+                return _merge_tecnopos_email_con_dian(resultado_dian, rapido)
+            if resultado_dian.get('status') == 'error':
+                # DIAN dio un error definitivo (no un timeout a
+                # reintentar) — aquí es donde TECNOPOS ayuda de verdad.
+                fallback = _fallback_tecnopos_sin_confirmar(nit, rapido)
+                if fallback:
+                    return fallback
+            # status == 'retry' (timeout ambiguo, solo posible en el
+            # intento 1 de DIAN): se deja seguir el flujo normal de
+            # reintentos sin tocar nada, para no reemplazar por un dato sin
+            # confirmar un caso que podría resolverse bien solo reintentando.
+            return resultado_dian
+        return rapido
     return consultar_nit_basica(nit, attempt)
