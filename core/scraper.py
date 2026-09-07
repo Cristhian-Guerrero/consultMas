@@ -3,8 +3,12 @@ Lógica de scraping DIAN — Consulta Express y RUT Detallado.
 """
 
 import logging
+import random
+import re
 import time
 from datetime import datetime
+
+import requests
 
 log = logging.getLogger(__name__)
 from config import (
@@ -400,9 +404,163 @@ def consultar_nit_rut_detallado(nit: str, attempt: int = 1):
             return_browser(driver)
 
 
+# ─────── TECNOPOS (sipos.com.co) — acelerador interno para Express ───────
+# Fuente NO oficial de un tercero: HTTP puro (sin navegador), ~0.3-0.4s por
+# consulta vs varios segundos de DIAN Express. Se usa como intento previo
+# silencioso: cualquier caso no confiable retorna None y el coordinador cae
+# automáticamente a consultar_nit_basica() (DIAN real). Nunca se expone al
+# usuario de dónde vino el dato — mismo Excel, mismos campos, sin marcas.
+#
+# Riesgo conocido y medido (ver BITÁCORA): la respuesta de TECNOPOS es
+# inestable (a veces no trae razonSocial/dv) y no separa nombre/apellido —
+# eso se resuelve aquí con la misma heurística validada en consulta-cedulas
+# (es_empresa + separación por conteo de palabras), con fix de 'LIMITADA' y
+# 'SOCIEDAD' agregado tras medir contra datos reales (tasa de error 3.96%
+# antes del fix, 0% después, sobre muestra de 101 razones sociales reales).
+# TECNOPOS nunca trae el estado del registro RUT — el modo RUT Detallado no
+# usa nada de esto.
+
+TECNOPOS_URL      = 'https://sipos.com.co/api_rut.php'
+TECNOPOS_REFERER  = 'https://sipos.com.co/consultarut'
+TECNOPOS_TIMEOUT  = 5
+
+# Sufijos societarios que indican EMPRESA, no persona natural. El chequeo es
+# por palabra individual, no por frase — por eso 'SOCIEDAD' cubre tanto
+# "SOCIEDAD ANONIMA" como "SOCIEDAD POR ACCIONES SIMPLIFICADA" sin tener que
+# listar la frase completa (que nunca matchearía palabra por palabra).
+SUFIJOS_EMPRESA = {'SAS', 'SA', 'LTDA', 'LIMITADA', 'CIA', 'EU', 'EIRL', 'ESE',
+                    'IPS', 'FUNDACION', 'COOPERATIVA', 'ASOCIACION', 'ONG',
+                    'SOCIEDAD'}
+
+# Partículas de apellido compuesto: su sola presencia hace incierto dónde
+# termina el apellido con una regla de conteo simple, así que se trata como
+# dudoso en vez de intentar pegarlas "inteligentemente".
+_PARTICULAS = {'DE', 'DEL', 'LA', 'LAS', 'LOS', 'SAN', 'SANTA',
+               'VAN', 'VON', 'MAC', 'MC'}
+
+# Nombres genéricos de POS/facturación que no representan a una persona real.
+_PLACEHOLDERS = {'VENTA MOSTRADOR', 'CONSUMIDOR FINAL', 'CLIENTE VARIOS',
+                  'PUBLICO EN GENERAL', 'CLIENTE OCASIONAL', 'SIN NOMBRE',
+                  'NO APLICA', 'VARIOS'}
+
+_PALABRA_RE = re.compile(r'^[A-ZÁÉÍÓÚÑÜ]+$')
+
+_tecnopos_session = None
+
+
+def es_empresa(razon_social: str) -> bool:
+    """True si alguna palabra es un sufijo societario (SAS, LTDA, S.A., ...).
+    Normaliza puntos ("S.A." -> "SA") antes de comparar."""
+    palabras = (razon_social or '').strip().upper().split()
+    return any(p.replace('.', '') in SUFIJOS_EMPRESA for p in palabras)
+
+
+def _separar_nombre(razon_social: str):
+    """Separa un nombre plano en apellidos/nombres por conteo de palabras
+    (estándar RUT: apellidos primero). Retorna None si es dudoso — vacío,
+    placeholder, <2 palabras, con partícula de apellido compuesto, o con
+    caracteres no alfabéticos. Ya se asume que es_empresa() dio False antes
+    de llamar esto."""
+    texto = (razon_social or '').strip().upper()
+    if not texto or texto in _PLACEHOLDERS:
+        return None
+
+    palabras = texto.split()
+    if len(palabras) < 2:
+        return None
+    if any(p in _PARTICULAS for p in palabras):
+        return None
+    if not all(_PALABRA_RE.match(p) for p in palabras):
+        return None
+
+    n = len(palabras)
+    if n == 2:
+        ap1, ap2, no1, otros = palabras[0], '', palabras[1], ''
+    elif n == 3:
+        ap1, ap2, no1, otros = palabras[0], palabras[1], palabras[2], ''
+    elif n == 4:
+        ap1, ap2, no1, otros = palabras[0], palabras[1], palabras[2], palabras[3]
+    else:
+        ap1, ap2, no1, otros = palabras[0], palabras[1], palabras[2], ' '.join(palabras[3:])
+    return ap1, ap2, no1, otros
+
+
+def _get_tecnopos_session():
+    global _tecnopos_session
+    if _tecnopos_session is None:
+        s = requests.Session()
+        s.headers.update({
+            'Referer': TECNOPOS_REFERER,
+            'User-Agent': ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+                            'AppleWebKit/537.36 (KHTML, like Gecko) '
+                            'Chrome/124.0 Safari/537.36'),
+        })
+        _tecnopos_session = s
+    return _tecnopos_session
+
+
+def consultar_tecnopos(nit: str):
+    """
+    Intento rápido vía sipos.com.co antes de recurrir a DIAN. Devuelve el
+    MISMO envelope que consultar_nit_basica() ({"status","data","error"})
+    para que caché/reintentos/Excel en ui/app.py no necesiten saber de dónde
+    vino el dato. Devuelve None si el resultado no es confiable (red, JSON
+    inestable, nombre de persona ambiguo) — el llamador cae a DIAN.
+    """
+    try:
+        time.sleep(random.uniform(0.05, 0.15))  # civismo con la API de un tercero
+        resp = _get_tecnopos_session().get(TECNOPOS_URL, params={'nit': nit},
+                                            timeout=TECNOPOS_TIMEOUT)
+        data = resp.json()
+    except Exception as e:
+        log.debug(f"TECNOPOS no disponible para {nit}: {e}")
+        return None
+
+    if not data.get('success'):
+        return None
+
+    razon_social = str(data.get('razon_social', '')).strip()
+    dv = data.get('dv', '')
+    if not razon_social or dv == '':
+        return None  # respuesta inestable (a veces trae direccion/ciudad/actividad en su lugar)
+
+    salida = {
+        'nit': nit,
+        'dv': str(dv),
+        'datetime': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        'tipo_consulta': 'basica',
+    }
+
+    if es_empresa(razon_social):
+        salida['razonSocial'] = razon_social
+        # sin nombre que partir — igual que hace DIAN para empresas
+    else:
+        partes = _separar_nombre(razon_social)
+        if partes is None:
+            return None  # nombre ambiguo, no confiar — cae a DIAN
+        ap1, ap2, no1, otros = partes
+        # Mismo convenio invertido que usa _extract_basica() más arriba: el
+        # HTML real de DIAN trae el apellido bajo el id "primerNombre" y el
+        # nombre bajo "primerApellido" (ver comentario en cabecera del
+        # archivo / memoria del proyecto). El mapeo a columnas de Excel en
+        # ui/app.py:_procesar() ya corrige esa inversión — para reusar ese
+        # código sin tocarlo, replicamos aquí la misma convención invertida.
+        salida['primerNombre']    = ap1     # apellido real
+        salida['otrosNombres']    = ap2     # segundo apellido real
+        salida['primerApellido']  = no1     # primer nombre real
+        salida['segundoApellido'] = otros   # otros nombres real
+        salida['razonSocial'] = None
+
+    return {"status": "success", "data": salida, "error": None}
+
+
 # ─────── Coordinador ───────
 
 def consultar_nit(nit: str, tipo: str = "basica", attempt: int = 1):
     if tipo == "rut_detallado":
         return consultar_nit_rut_detallado(nit, attempt)
+    if attempt == 1:
+        rapido = consultar_tecnopos(nit)
+        if rapido is not None:
+            return rapido
     return consultar_nit_basica(nit, attempt)
