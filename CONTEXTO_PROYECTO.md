@@ -1,0 +1,148 @@
+# PROYECTO: consultMas V4.10
+
+**Cliente:** A.S. Contadores & Asesores SAS — Pasto, Colombia
+**Repo:** https://github.com/Cristhian-Guerrero/consultMas
+**Rama activa:** `refactor/modular-structure`
+**Última versión pusheada:** V4.10 (commit `e5e817e`)
+
+> Este archivo es la fuente de verdad del proyecto — arquitectura, decisiones
+> de diseño, gotchas y estado real. Léelo primero al retomar sesión. La
+> memoria de Claude (fuera de este repo) guarda un resumen y apunta aquí.
+
+## Estado actual
+
+App de escritorio (Python + Tkinter) que consulta NITs/cédulas masivamente
+contra el portal de la DIAN y genera reportes Excel. Desde V4.9 tiene un
+acelerador interno vía TECNOPOS (sipos.com.co) para el modo Express.
+
+## Estructura de archivos
+
+```
+main.py          ← punto de entrada (logging.basicConfig aquí)
+config.py        ← URLs, selectores, timeouts, mensajes rotativos
+core/
+  browser.py     ← pool de navegadores Chromium (máx 4, limpieza cada 10 requests)
+  scraper.py     ← scraping DIAN (Express + RUT Detallado) + TECNOPOS
+  excel.py       ← formato y estilos del Excel generado
+ui/
+  app.py         ← GUI Tkinter — ConsultaRUTApp (_procesar es el loop principal)
+version_info.txt ← metadatos del .exe para Windows (mantener en sync con VERSION)
+```
+
+## Modos de consulta
+
+- **Express** (`tipo="basica"`): único modo seleccionable en la UI hoy.
+- **RUT Detallado** (`tipo="rut_detallado"`): trae `Estado del Registro`
+  (activo/inactivo), dato que ni DIAN Express ni TECNOPOS traen nunca.
+  **⚠️ El código backend sigue completo y funcional, pero no hay ningún
+  radio button ni control en `ui/app.py` para seleccionarlo** (se perdió en
+  algún punto del refactor modular, no está documentado cuándo ni por qué).
+  Confirmado revisando el archivo completo: solo existe un
+  `ttk.Radiobutton` (Express). Sin resolver — pendiente confirmar con el
+  cliente si todavía lo necesita.
+
+## TECNOPOS (sipos.com.co) — acelerador interno para Express, desde V4.9
+
+Fuente NO oficial de un tercero (TECNOPOS, software POS), endpoint
+`GET https://sipos.com.co/api_rut.php?nit={nit}`, HTTP puro vía `requests`
+(sin navegador), header `Referer: https://sipos.com.co/consultarut` como
+único requisito. ~0.4-0.7s por consulta vs ~2.5-4.5s de DIAN Express.
+
+**Uso: SOLO para empresas confirmadas.** `consultar_tecnopos()` en
+`core/scraper.py` llama a `es_empresa(razon_social)`; si no confirma
+empresa, retorna `None` de inmediato y el coordinador `consultar_nit()`
+cae a `consultar_nit_basica()` (DIAN real). Nunca se expone al usuario de
+dónde vino el dato — mismo Excel, mismos campos.
+
+### Por qué NO se usa para personas naturales (hallazgo crítico, V4.10)
+
+TECNOPOS **no tiene un orden de palabras consistente** en `razon_social`
+para personas naturales. Confirmado con 3 NITs reales:
+- `79750160` → "HERRERA CARRION WILSON ALBERTO" → apellidos primero
+- `52156616` → "NIÑO ESPEJO LINA JIBE" → apellidos primero
+- `87069568` → "ALBERTO EDMUNDO SANCHEZ MARTINEZ" → **nombres primero**
+
+Ninguna regla posicional fija sirve para los tres casos a la vez, y no hay
+señal en el JSON para distinguir cuál es cuál. Por eso se descartó
+completamente intentar separar nombres desde TECNOPOS — `_separar_nombre()`
+sigue en el código pero sin usar en este flujo, a propósito. DIAN sigue
+siendo la única fuente para personas naturales porque tiene apellidos y
+nombres en campos HTML separados de verdad (no un string a adivinar).
+
+### Limitación conocida — detección de empresa vía sufijo
+
+`es_empresa()` (en `core/scraper.py`) detecta empresa por palabra-sufijo:
+`SAS, SA, LTDA, LIMITADA, CIA, EU, EIRL, ESE, IPS, FUNDACION, COOPERATIVA,
+ASOCIACION, ONG, SOCIEDAD, ESP`. También une siglas sueltas de una letra
+("S A" → "SA", confirmado real con NIT 830114921 "COLOMBIA MOVIL S A ESP",
+TECNOPOS a veces no manda los puntos).
+
+Una razón social **sin sufijo societario reconocible** (ej. "DROGUERIA
+DAGUA", NIT 800140016 — nombre comercial, no forma jurídica) no se detecta
+como empresa. **Ya no es riesgo de datos incorrectos** (desde el fix de
+"TECNOPOS solo para empresas": si `es_empresa()` no la reconoce, cae a
+DIAN igual, que sí sabe internamente si es persona o empresa) — es
+solamente una oportunidad de velocidad perdida para esos NITs puntuales.
+No tiene fix simple (necesitaría un diccionario de sustantivos de tipo de
+negocio, con cobertura nunca 100% y riesgo de falsos positivos).
+
+## Validación hecha (Fase 1, offline, sin tocar producción)
+
+Contra 101 razones sociales reales (5 del histórico de consultMas + 96 del
+registro público de Cámara de Comercio, `datos.gov.co` dataset `xpg6-d7rc`):
+tasa de clasificación errónea 0.00% tras los fixes de `LIMITADA`/`SOCIEDAD`/
+`ESP` + unión de siglas sueltas. Reproducible con
+`core.scraper.es_empresa` + `core.scraper._separar_nombre` sin red.
+
+## Quirk importante — DIAN portal (preexistente, no tocado en V4.9/V4.10)
+
+Los IDs del HTML del portal DIAN Express tienen los nombres INVERTIDOS
+respecto a las etiquetas visuales: HTML id `primerApellido` → contiene el
+NOMBRE, HTML id `primerNombre` → contiene el APELLIDO. Corregido en
+`ui/app.py:_procesar()` al mapear a columnas de Excel. Confirmado con
+`inspeccion_dian.py` para NIT 79750160 (V4.8) y re-validado en V4.10 contra
+el histórico real (ver arriba).
+
+## Columnas del Excel (modo Express, desde V4.10)
+
+`NIT, DV, Primer Apellido, Segundo Apellido, Primer Nombre, Otros Nombres,
+Razón Social, Email, Dirección, Ciudad, Actividad, Fecha Consulta, Estado
+Consulta, Tipo de Consulta, Observaciones`
+
+`Email/Dirección/Ciudad/Actividad` solo vienen de TECNOPOS (nunca de DIAN).
+En la práctica, **Email es el único que se puebla con frecuencia** —
+Dirección/Ciudad/Actividad casi siempre salen "-": cuando TECNOPOS las
+trae, viene sin `dv`, y por eso esa respuesta se descarta entera (no se
+publica un NIT sin DV confirmado) y cae a DIAN, que tampoco las tiene.
+
+RUT Detallado no cambió: mismas columnas de siempre, sin Email/Dirección/etc.
+
+## Flujo de trabajo
+
+1. `source venv/bin/activate`
+2. Cambios en los módulos correspondientes
+3. Probar con `python main.py` (NO `app.py`, no existe en esta rama)
+4. Compilar-check + regresión offline antes de commit:
+   ```bash
+   python -m py_compile core/scraper.py ui/app.py core/excel.py
+   ```
+5. Al terminar un cambio: **actualizar VERSION en `ui/app.py`,
+   `version_info.txt`, y este archivo** — mantenerlos sincronizados en el
+   mismo commit.
+6. `git add <archivos> && git commit -m "..." && git push origin refactor/modular-structure`
+7. GitHub Actions compila el .exe automáticamente (`gh run watch <id>
+   --repo Cristhian-Guerrero/consultMas --exit-status` para seguirlo)
+8. Descargar .exe desde Actions → Artifacts
+
+## Historial de versiones
+
+- **V4.7** — Toggle duplicados, fix Excel vacío, corrección mapeo nombres (rama `main`)
+- **V4.8** — Refactor arquitectura modular, caché por NIT, fix numpy en CI
+- **V4.9** — TECNOPOS como acelerador interno para Express (con bug: intentaba separar nombres de personas también)
+- **V4.10** — Fix crítico: TECNOPOS solo para empresas (orden de palabras de personas naturales no es confiable); fix `es_empresa()` (LIMITADA, SOCIEDAD, ESP, siglas sueltas); columnas Email/Dirección/Ciudad/Actividad en Excel Express
+
+## Pendiente / conocido sin resolver
+
+- Selector de RUT Detallado ausente en la UI (ver arriba) — confirmar con Betto.
+- "DROGUERIA DAGUA"-type: razones sociales sin sufijo reconocible, pérdida de velocidad (no de correctitud).
+- Testing en Windows real de V4.10 (Email/Dirección/Ciudad/Actividad + fix empresas) — pendiente confirmación de Betto.
