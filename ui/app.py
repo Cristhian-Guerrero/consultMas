@@ -23,7 +23,7 @@ from core.excel import apply_formatting
 
 class ConsultaRUTApp(tk.Tk):
 
-    VERSION = "V4.10 CG"
+    VERSION = "V4.11 CG"
 
     COLORS = {
         'primary':        "#166534",
@@ -535,9 +535,6 @@ class ConsultaRUTApp(tk.Tk):
                             "Otros Nombres":    limpiar(data.get("segundoApellido")),
                             "Razón Social":     limpiar(data.get("razonSocial")),
                             "Email":            limpiar(data.get("email")),
-                            "Dirección":        limpiar(data.get("direccion")),
-                            "Ciudad":           limpiar(data.get("ciudad")),
-                            "Actividad":        limpiar(data.get("actividad")),
                             "Fecha Consulta":   data.get("datetime", ""),
                             "Estado Consulta":  "Exitoso",
                             "Tipo de Consulta": "Express",
@@ -576,7 +573,7 @@ class ConsultaRUTApp(tk.Tk):
                         "Primer Nombre": "-", "Otros Nombres": "-", "Razón Social": "-",
                     }
                     if tipo == "basica":
-                        base_fila.update({"Email": "-", "Dirección": "-", "Ciudad": "-", "Actividad": "-"})
+                        base_fila["Email"] = "-"
                     base_fila.update({
                         "Fecha Consulta": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                         "Estado Consulta": "No Inscrito", "Tipo de Consulta": "Express" if tipo == "basica" else "RUT Detallado",

@@ -1,9 +1,9 @@
-# PROYECTO: consultMas V4.10
+# PROYECTO: consultMas V4.11
 
 **Cliente:** A.S. Contadores & Asesores SAS — Pasto, Colombia
 **Repo:** https://github.com/Cristhian-Guerrero/consultMas
 **Rama activa:** `refactor/modular-structure`
-**Última versión pusheada:** V4.10 (commit `e5e817e`)
+**Última versión pusheada:** V4.11
 
 > Este archivo es la fuente de verdad del proyecto — arquitectura, decisiones
 > de diseño, gotchas y estado real. Léelo primero al retomar sesión. La
@@ -103,19 +103,20 @@ NOMBRE, HTML id `primerNombre` → contiene el APELLIDO. Corregido en
 `inspeccion_dian.py` para NIT 79750160 (V4.8) y re-validado en V4.10 contra
 el histórico real (ver arriba).
 
-## Columnas del Excel (modo Express, desde V4.10)
+## Columnas del Excel (modo Express, desde V4.11)
 
 `NIT, DV, Primer Apellido, Segundo Apellido, Primer Nombre, Otros Nombres,
-Razón Social, Email, Dirección, Ciudad, Actividad, Fecha Consulta, Estado
-Consulta, Tipo de Consulta, Observaciones`
+Razón Social, Email, Fecha Consulta, Estado Consulta, Tipo de Consulta,
+Observaciones`
 
-`Email/Dirección/Ciudad/Actividad` solo vienen de TECNOPOS (nunca de DIAN).
-En la práctica, **Email es el único que se puebla con frecuencia** —
-Dirección/Ciudad/Actividad casi siempre salen "-": cuando TECNOPOS las
-trae, viene sin `dv`, y por eso esa respuesta se descarta entera (no se
-publica un NIT sin DV confirmado) y cae a DIAN, que tampoco las tiene.
+`Email` solo viene de TECNOPOS (nunca de DIAN) — "-" cuando el NIT se
+resolvió por DIAN. `Dirección/Ciudad/Actividad` se agregaron en V4.10 y se
+quitaron en V4.11: en la práctica casi siempre salían "-" (cuando TECNOPOS
+las trae, viene sin `dv`, y esa respuesta se descarta entera — no se
+publica un NIT sin DV confirmado — así que caía a DIAN, que tampoco las
+tiene), así que no aportaban valor real y se simplificó el Excel.
 
-RUT Detallado no cambió: mismas columnas de siempre, sin Email/Dirección/etc.
+RUT Detallado no cambió: mismas columnas de siempre, sin Email.
 
 ## Flujo de trabajo
 
@@ -140,6 +141,7 @@ RUT Detallado no cambió: mismas columnas de siempre, sin Email/Dirección/etc.
 - **V4.8** — Refactor arquitectura modular, caché por NIT, fix numpy en CI
 - **V4.9** — TECNOPOS como acelerador interno para Express (con bug: intentaba separar nombres de personas también)
 - **V4.10** — Fix crítico: TECNOPOS solo para empresas (orden de palabras de personas naturales no es confiable); fix `es_empresa()` (LIMITADA, SOCIEDAD, ESP, siglas sueltas); columnas Email/Dirección/Ciudad/Actividad en Excel Express
+- **V4.11** — Simplificación: se quitan Dirección/Ciudad/Actividad del Excel (casi siempre "-", no aportaban); se mantiene Email
 
 ## Pendiente / conocido sin resolver
 

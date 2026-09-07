@@ -549,14 +549,7 @@ def consultar_tecnopos(nit: str):
         'dv': str(dv),
         'datetime': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
         'tipo_consulta': 'basica',
-        # Campos extra de TECNOPOS — inestables (ver docstring), casi siempre
-        # vacíos en la práctica: cuando el JSON trae direccion/ciudad/actividad
-        # no trae dv, y por eso ya se descartó la respuesta arriba. Se dejan
-        # como '' (no None) para que limpiar() en ui/app.py los muestre "-".
-        'email':     str(data.get('email', '') or '').strip(),
-        'direccion': str(data.get('direccion', '') or '').strip(),
-        'ciudad':    str(data.get('ciudad', '') or '').strip(),
-        'actividad': str(data.get('actividad', '') or '').strip(),
+        'email': str(data.get('email', '') or '').strip(),
     }
 
     if not es_empresa(razon_social):
