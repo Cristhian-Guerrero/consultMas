@@ -430,7 +430,7 @@ TECNOPOS_TIMEOUT  = 5
 # listar la frase completa (que nunca matchearía palabra por palabra).
 SUFIJOS_EMPRESA = {'SAS', 'SA', 'LTDA', 'LIMITADA', 'CIA', 'EU', 'EIRL', 'ESE',
                     'IPS', 'FUNDACION', 'COOPERATIVA', 'ASOCIACION', 'ONG',
-                    'SOCIEDAD'}
+                    'SOCIEDAD', 'ESP'}
 
 # Partículas de apellido compuesto: su sola presencia hace incierto dónde
 # termina el apellido con una regla de conteo simple, así que se trata como
@@ -450,9 +450,29 @@ _tecnopos_session = None
 
 def es_empresa(razon_social: str) -> bool:
     """True si alguna palabra es un sufijo societario (SAS, LTDA, S.A., ...).
-    Normaliza puntos ("S.A." -> "SA") antes de comparar."""
+    Normaliza puntos ("S.A." -> "SA") antes de comparar.
+
+    TECNOPOS a veces separa las siglas con espacio en vez de punto (ej.
+    "COLOMBIA MOVIL S A ESP" en vez de "S.A. E.S.P" — confirmado en vivo,
+    NIT 830114921). Eso deja "S" y "A" como palabras sueltas de una letra
+    que nunca matchean 'SA' completo, así que además se unen corridas de
+    palabras de una sola letra ("S", "A" -> "SA") antes de comparar."""
     palabras = (razon_social or '').strip().upper().split()
-    return any(p.replace('.', '') in SUFIJOS_EMPRESA for p in palabras)
+    limpias = [p.replace('.', '') for p in palabras]
+    if any(p in SUFIJOS_EMPRESA for p in limpias):
+        return True
+
+    siglas, actual = [], ''
+    for p in limpias:
+        if len(p) == 1 and p.isalpha():
+            actual += p
+        else:
+            if actual:
+                siglas.append(actual)
+            actual = ''
+    if actual:
+        siglas.append(actual)
+    return any(s in SUFIJOS_EMPRESA for s in siglas)
 
 
 def _separar_nombre(razon_social: str):
@@ -529,27 +549,31 @@ def consultar_tecnopos(nit: str):
         'dv': str(dv),
         'datetime': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
         'tipo_consulta': 'basica',
+        # Campos extra de TECNOPOS — inestables (ver docstring), casi siempre
+        # vacíos en la práctica: cuando el JSON trae direccion/ciudad/actividad
+        # no trae dv, y por eso ya se descartó la respuesta arriba. Se dejan
+        # como '' (no None) para que limpiar() en ui/app.py los muestre "-".
+        'email':     str(data.get('email', '') or '').strip(),
+        'direccion': str(data.get('direccion', '') or '').strip(),
+        'ciudad':    str(data.get('ciudad', '') or '').strip(),
+        'actividad': str(data.get('actividad', '') or '').strip(),
     }
 
-    if es_empresa(razon_social):
-        salida['razonSocial'] = razon_social
-        # sin nombre que partir — igual que hace DIAN para empresas
-    else:
-        partes = _separar_nombre(razon_social)
-        if partes is None:
-            return None  # nombre ambiguo, no confiar — cae a DIAN
-        ap1, ap2, no1, otros = partes
-        # Mismo convenio invertido que usa _extract_basica() más arriba: el
-        # HTML real de DIAN trae el apellido bajo el id "primerNombre" y el
-        # nombre bajo "primerApellido" (ver comentario en cabecera del
-        # archivo / memoria del proyecto). El mapeo a columnas de Excel en
-        # ui/app.py:_procesar() ya corrige esa inversión — para reusar ese
-        # código sin tocarlo, replicamos aquí la misma convención invertida.
-        salida['primerNombre']    = ap1     # apellido real
-        salida['otrosNombres']    = ap2     # segundo apellido real
-        salida['primerApellido']  = no1     # primer nombre real
-        salida['segundoApellido'] = otros   # otros nombres real
-        salida['razonSocial'] = None
+    if not es_empresa(razon_social):
+        # TECNOPOS NO tiene un orden de palabras consistente para personas
+        # naturales — confirmado con 3 NITs reales: unos vienen "apellidos
+        # nombres" (79750160, 52156616) y otros "nombres apellidos"
+        # (87069568, "ALBERTO EDMUNDO SANCHEZ MARTINEZ"). Ninguna regla
+        # posicional fija sirve para los dos casos a la vez, y no hay señal
+        # en el JSON para distinguir cuál es cuál. Por eso TECNOPOS ya NO se
+        # usa para personas naturales bajo ninguna circunstancia — siempre
+        # cae a DIAN, que sí tiene apellidos/nombres en campos separados de
+        # verdad (no un string a adivinar). _separar_nombre() queda sin usar
+        # aquí a propósito.
+        return None
+
+    salida['razonSocial'] = razon_social
+    # sin nombre que partir — solo empresas llegan aquí, igual que hace DIAN
 
     return {"status": "success", "data": salida, "error": None}
 
