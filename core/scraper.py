@@ -519,6 +519,28 @@ def _get_tecnopos_session():
     return _tecnopos_session
 
 
+def _fetch_tecnopos(nit: str, intento: int = 1):
+    """GET a TECNOPOS con reintentos — SOLO ante fallas de red/timeout, no
+    ante un 'success:false' limpio (un NIT no encontrado no cambia al
+    reintentar; verificado con 3 intentos reales sobre 2 NITs, siempre la
+    misma respuesta consistente — reintentar eso solo desperdicia tiempo y
+    pega de más contra el servidor de un tercero sin necesidad)."""
+    try:
+        resp = _get_tecnopos_session().get(TECNOPOS_URL, params={'nit': nit},
+                                            timeout=TECNOPOS_TIMEOUT)
+        resp.raise_for_status()
+        return resp.json()
+    except (requests.Timeout, requests.ConnectionError) as e:
+        if intento < 3:
+            time.sleep(0.5 * intento)  # backoff lineal: 0.5s, 1.0s
+            return _fetch_tecnopos(nit, intento + 1)
+        log.debug(f"TECNOPOS timeout persistente para {nit} tras 3 intentos: {e}")
+        return None
+    except Exception as e:
+        log.debug(f"TECNOPOS no disponible para {nit}: {e}")
+        return None
+
+
 def consultar_tecnopos(nit: str):
     """
     Intento rápido vía sipos.com.co antes de recurrir a DIAN. Devuelve el
@@ -527,13 +549,9 @@ def consultar_tecnopos(nit: str):
     vino el dato. Devuelve None si el resultado no es confiable (red, JSON
     inestable, nombre de persona ambiguo) — el llamador cae a DIAN.
     """
-    try:
-        time.sleep(random.uniform(0.05, 0.15))  # civismo con la API de un tercero
-        resp = _get_tecnopos_session().get(TECNOPOS_URL, params={'nit': nit},
-                                            timeout=TECNOPOS_TIMEOUT)
-        data = resp.json()
-    except Exception as e:
-        log.debug(f"TECNOPOS no disponible para {nit}: {e}")
+    time.sleep(random.uniform(0.05, 0.15))  # civismo con la API de un tercero
+    data = _fetch_tecnopos(nit)
+    if data is None:
         return None
 
     if not data.get('success'):
@@ -566,8 +584,16 @@ def consultar_tecnopos(nit: str):
         # El email sí es seguro de usar (no tiene ambigüedad de orden), así
         # que se devuelve para que el coordinador lo fusione con el nombre
         # real de DIAN — email rápido + nombre confiable, sin mezclar el
-        # riesgo de uno con el otro.
-        return {'email': salida['email'], '_es_persona': True}
+        # riesgo de uno con el otro. También se guarda la razón social CRUDA
+        # (sin partir) y el DV, por si DIAN no encuentra el NIT — TECNOPOS
+        # sirve entonces de apoyo/último recurso, mostrando el nombre
+        # completo sin separar (nunca se arriesga el orden apellido/nombre).
+        return {
+            'email': salida['email'],
+            '_es_persona': True,
+            '_razon_social_sin_confirmar': razon_social,
+            '_dv_sin_confirmar': salida['dv'],
+        }
 
     salida['razonSocial'] = razon_social
     # sin nombre que partir — solo empresas llegan aquí, igual que hace DIAN
@@ -587,6 +613,32 @@ def _merge_tecnopos_email_con_dian(resultado_dian: dict, resultado_tecnopos: dic
     return resultado_dian
 
 
+def _fallback_tecnopos_sin_confirmar(nit: str, resultado_tecnopos: dict):
+    """Último recurso cuando DIAN no encuentra el NIT pero TECNOPOS sí tiene
+    algo: TECNOPOS es precisamente para eso — apoyar cuando DIAN no
+    responde. Se usa la razón social COMPLETA sin partir en apellido/nombre
+    (el orden de palabras de TECNOPOS no es confiable — ver
+    consultar_tecnopos) y se marca explícitamente en Observaciones como sin
+    confirmar, para que quede claro que no pasó por DIAN. Retorna None si
+    TECNOPOS tampoco tenía nada guardado (era una empresa, o falló)."""
+    razon = resultado_tecnopos.get('_razon_social_sin_confirmar')
+    if not razon:
+        return None
+    return {
+        "status": "success",
+        "data": {
+            "nit": nit,
+            "dv": resultado_tecnopos.get('_dv_sin_confirmar', ''),
+            "razonSocial": razon,
+            "email": resultado_tecnopos.get('email', ''),
+            "datetime": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            "tipo_consulta": "basica",
+            "observacion": "Dato de TECNOPOS sin confirmar en DIAN — verificar manualmente",
+        },
+        "error": None,
+    }
+
+
 # ─────── Coordinador ───────
 
 def consultar_nit(nit: str, tipo: str = "basica", attempt: int = 1):
@@ -597,6 +649,18 @@ def consultar_nit(nit: str, tipo: str = "basica", attempt: int = 1):
         if rapido is not None:
             if rapido.get('_es_persona'):
                 resultado_dian = consultar_nit_basica(nit, attempt)
-                return _merge_tecnopos_email_con_dian(resultado_dian, rapido)
+                if resultado_dian.get('status') == 'success':
+                    return _merge_tecnopos_email_con_dian(resultado_dian, rapido)
+                if resultado_dian.get('status') == 'error':
+                    # DIAN dio un error definitivo (no un timeout a
+                    # reintentar) — aquí es donde TECNOPOS ayuda de verdad.
+                    fallback = _fallback_tecnopos_sin_confirmar(nit, rapido)
+                    if fallback:
+                        return fallback
+                # status == 'retry' (timeout ambiguo): se deja seguir el
+                # flujo normal de reintentos de DIAN sin tocar nada, para no
+                # reemplazar por un dato sin confirmar un caso que podría
+                # resolverse bien solo con reintentar.
+                return resultado_dian
             return rapido
     return consultar_nit_basica(nit, attempt)

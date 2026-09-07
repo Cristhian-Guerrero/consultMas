@@ -1,9 +1,9 @@
-# PROYECTO: consultMas V4.12
+# PROYECTO: consultMas V4.13
 
 **Cliente:** A.S. Contadores & Asesores SAS — Pasto, Colombia
 **Repo:** https://github.com/Cristhian-Guerrero/consultMas
 **Rama activa:** `refactor/modular-structure`
-**Última versión pusheada:** V4.12
+**Última versión pusheada:** V4.13
 
 > Este archivo es la fuente de verdad del proyecto — arquitectura, decisiones
 > de diseño, gotchas y estado real. Léelo primero al retomar sesión. La
@@ -71,6 +71,33 @@ Limitación conocida y aceptada: el merge solo ocurre en el intento 1 de
 reintento (`attempt=2` o `3`), el email ya obtenido en el intento 1 no se
 vuelve a fusionar — caso raro (solo cuando DIAN da timeout), y solo afecta
 el email (dato complementario), nunca el nombre.
+
+### TECNOPOS como apoyo cuando DIAN no encuentra el NIT (V4.13)
+
+Razón de ser del proyecto según el cliente: "esta página es de ayuda a la
+DIAN — si no lo encuentra en la DIAN, esta página sí". Desde V4.13, cuando
+DIAN responde con **error definitivo** (no un timeout ambiguo — ver abajo)
+para un NIT que TECNOPOS sí tenía, se usa TECNOPOS como último recurso vía
+`_fallback_tecnopos_sin_confirmar()`: la razón social se muestra **completa,
+sin partir** en apellido/nombre (el orden sigue sin ser confiable — ver
+V4.10 abajo), con `Observaciones = "Dato de TECNOPOS sin confirmar en DIAN
+— verificar manualmente"` para que quede explícito que no pasó por DIAN.
+
+**Solo aplica cuando `resultado_dian['status'] == 'error'`, NO cuando es
+`'retry'`** (timeout en el primer intento, ambiguo — podría resolverse
+solo con reintentar). Esto es deliberado: no reemplazar un caso que
+todavía podría salir bien por DIAN con un dato sin confirmar. Efecto
+secundario conocido y aceptado: si DIAN falla por red (no por "no
+encontrado" real) en los 3 intentos, el fallback de TECNOPOS no se activa
+porque el coordinador solo consulta TECNOPOS en `attempt == 1` — caso raro,
+documentado, no resuelto (requeriría rediseñar el mecanismo de reintentos).
+
+### Reintentos en TECNOPOS (V4.12.1)
+
+`_fetch_tecnopos()` reintenta hasta 3 veces, pero **solo ante fallas reales
+de red** (`Timeout`, `ConnectionError`) — nunca ante un `success:false`
+limpio (un NIT no encontrado no cambia al reintentar, verificado con
+pruebas reales). Backoff lineal 0.5s/1.0s entre intentos.
 
 ### Por qué el nombre NO se usa de TECNOPOS para personas naturales (hallazgo crítico, V4.10)
 
@@ -161,6 +188,8 @@ RUT Detallado no cambió: mismas columnas de siempre, sin Email.
 - **V4.10** — Fix crítico: TECNOPOS solo para empresas (orden de palabras de personas naturales no es confiable); fix `es_empresa()` (LIMITADA, SOCIEDAD, ESP, siglas sueltas); columnas Email/Dirección/Ciudad/Actividad en Excel Express
 - **V4.11** — Simplificación: se quitan Dirección/Ciudad/Actividad del Excel (casi siempre "-", no aportaban); se mantiene Email
 - **V4.12** — Recupera Email de TECNOPOS para personas naturales, fusionado con el nombre real de DIAN (`_merge_tecnopos_email_con_dian`) — antes se descartaba todo, incluido el email, solo por la ambigüedad del nombre
+- **V4.12.1** — Reintentos automáticos en TECNOPOS (máx 3, solo ante fallas de red, backoff 0.5s/1.0s)
+- **V4.13** — TECNOPOS como último recurso cuando DIAN da error definitivo (no timeout) — razón social completa sin partir, marcada "sin confirmar" en Observaciones
 
 ## Pendiente / conocido sin resolver
 

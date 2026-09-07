@@ -23,7 +23,7 @@ from core.excel import apply_formatting
 
 class ConsultaRUTApp(tk.Tk):
 
-    VERSION = "V4.12 CG"
+    VERSION = "V4.13 CG"
 
     COLORS = {
         'primary':        "#166534",
