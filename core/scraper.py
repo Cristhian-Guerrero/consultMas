@@ -558,17 +558,33 @@ def consultar_tecnopos(nit: str):
         # nombres" (79750160, 52156616) y otros "nombres apellidos"
         # (87069568, "ALBERTO EDMUNDO SANCHEZ MARTINEZ"). Ninguna regla
         # posicional fija sirve para los dos casos a la vez, y no hay señal
-        # en el JSON para distinguir cuál es cuál. Por eso TECNOPOS ya NO se
-        # usa para personas naturales bajo ninguna circunstancia — siempre
-        # cae a DIAN, que sí tiene apellidos/nombres en campos separados de
-        # verdad (no un string a adivinar). _separar_nombre() queda sin usar
-        # aquí a propósito.
-        return None
+        # en el JSON para distinguir cuál es cuál. El nombre de una persona
+        # natural NUNCA sale de TECNOPOS, bajo ninguna circunstancia —
+        # siempre de DIAN, que tiene apellidos/nombres en campos separados
+        # de verdad. _separar_nombre() sigue sin usarse aquí a propósito.
+        #
+        # El email sí es seguro de usar (no tiene ambigüedad de orden), así
+        # que se devuelve para que el coordinador lo fusione con el nombre
+        # real de DIAN — email rápido + nombre confiable, sin mezclar el
+        # riesgo de uno con el otro.
+        return {'email': salida['email'], '_es_persona': True}
 
     salida['razonSocial'] = razon_social
     # sin nombre que partir — solo empresas llegan aquí, igual que hace DIAN
 
     return {"status": "success", "data": salida, "error": None}
+
+
+def _merge_tecnopos_email_con_dian(resultado_dian: dict, resultado_tecnopos: dict) -> dict:
+    """Inyecta el email de TECNOPOS en el resultado de DIAN para personas
+    naturales. El nombre siempre es el de DIAN (confiable) — el email es un
+    extra que se agrega solo si DIAN respondió con éxito. IMPORTANTE: el
+    email va dentro de resultado_dian['data'], no en la raíz del envelope
+    — ui/app.py lee data.get('email'), no resultado.get('email')."""
+    email = resultado_tecnopos.get('email')
+    if resultado_dian.get('status') == 'success' and email:
+        resultado_dian['data']['email'] = email
+    return resultado_dian
 
 
 # ─────── Coordinador ───────
@@ -579,5 +595,8 @@ def consultar_nit(nit: str, tipo: str = "basica", attempt: int = 1):
     if attempt == 1:
         rapido = consultar_tecnopos(nit)
         if rapido is not None:
+            if rapido.get('_es_persona'):
+                resultado_dian = consultar_nit_basica(nit, attempt)
+                return _merge_tecnopos_email_con_dian(resultado_dian, rapido)
             return rapido
     return consultar_nit_basica(nit, attempt)

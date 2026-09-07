@@ -1,9 +1,9 @@
-# PROYECTO: consultMas V4.11
+# PROYECTO: consultMas V4.12
 
 **Cliente:** A.S. Contadores & Asesores SAS — Pasto, Colombia
 **Repo:** https://github.com/Cristhian-Guerrero/consultMas
 **Rama activa:** `refactor/modular-structure`
-**Última versión pusheada:** V4.11
+**Última versión pusheada:** V4.12
 
 > Este archivo es la fuente de verdad del proyecto — arquitectura, decisiones
 > de diseño, gotchas y estado real. Léelo primero al retomar sesión. La
@@ -54,7 +54,25 @@ empresa, retorna `None` de inmediato y el coordinador `consultar_nit()`
 cae a `consultar_nit_basica()` (DIAN real). Nunca se expone al usuario de
 dónde vino el dato — mismo Excel, mismos campos.
 
-### Por qué NO se usa para personas naturales (hallazgo crítico, V4.10)
+### Email de personas naturales (V4.12) — merge TECNOPOS + DIAN
+
+Desde V4.12, cuando `consultar_tecnopos()` detecta que un NIT NO es
+empresa, ya no descarta todo — devuelve `{'email': ..., '_es_persona':
+True}` (el email no tiene ambigüedad de orden, a diferencia del nombre). El
+coordinador `consultar_nit()` ve ese flag, consulta DIAN normalmente para
+obtener el nombre confiable, y `_merge_tecnopos_email_con_dian()` inyecta
+el email dentro de `resultado_dian['data']['email']` antes de devolver el
+resultado final. `ui/app.py` no necesitó ningún cambio — ya leía
+`data.get("email")` de forma genérica. El nombre de personas naturales
+sigue viniendo 100% de DIAN, nunca de TECNOPOS.
+
+Limitación conocida y aceptada: el merge solo ocurre en el intento 1 de
+`consultar_nit()` (mismo gate que el resto de TECNOPOS). Si DIAN necesita
+reintento (`attempt=2` o `3`), el email ya obtenido en el intento 1 no se
+vuelve a fusionar — caso raro (solo cuando DIAN da timeout), y solo afecta
+el email (dato complementario), nunca el nombre.
+
+### Por qué el nombre NO se usa de TECNOPOS para personas naturales (hallazgo crítico, V4.10)
 
 TECNOPOS **no tiene un orden de palabras consistente** en `razon_social`
 para personas naturales. Confirmado con 3 NITs reales:
@@ -142,6 +160,7 @@ RUT Detallado no cambió: mismas columnas de siempre, sin Email.
 - **V4.9** — TECNOPOS como acelerador interno para Express (con bug: intentaba separar nombres de personas también)
 - **V4.10** — Fix crítico: TECNOPOS solo para empresas (orden de palabras de personas naturales no es confiable); fix `es_empresa()` (LIMITADA, SOCIEDAD, ESP, siglas sueltas); columnas Email/Dirección/Ciudad/Actividad en Excel Express
 - **V4.11** — Simplificación: se quitan Dirección/Ciudad/Actividad del Excel (casi siempre "-", no aportaban); se mantiene Email
+- **V4.12** — Recupera Email de TECNOPOS para personas naturales, fusionado con el nombre real de DIAN (`_merge_tecnopos_email_con_dian`) — antes se descartaba todo, incluido el email, solo por la ambigüedad del nombre
 
 ## Pendiente / conocido sin resolver
 
