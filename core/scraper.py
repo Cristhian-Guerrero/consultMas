@@ -601,18 +601,6 @@ def consultar_tecnopos(nit: str):
     return {"status": "success", "data": salida, "error": None}
 
 
-def _merge_tecnopos_email_con_dian(resultado_dian: dict, resultado_tecnopos: dict) -> dict:
-    """Inyecta el email de TECNOPOS en el resultado de DIAN para personas
-    naturales. El nombre siempre es el de DIAN (confiable) — el email es un
-    extra que se agrega solo si DIAN respondió con éxito. IMPORTANTE: el
-    email va dentro de resultado_dian['data'], no en la raíz del envelope
-    — ui/app.py lee data.get('email'), no resultado.get('email')."""
-    email = resultado_tecnopos.get('email')
-    if resultado_dian.get('status') == 'success' and email:
-        resultado_dian['data']['email'] = email
-    return resultado_dian
-
-
 def _fallback_tecnopos_sin_confirmar(nit: str, resultado_tecnopos: dict):
     """Último recurso cuando DIAN no encuentra el NIT pero TECNOPOS sí tiene
     algo: TECNOPOS es precisamente para eso — apoyar cuando DIAN no
@@ -641,36 +629,88 @@ def _fallback_tecnopos_sin_confirmar(nit: str, resultado_tecnopos: dict):
 
 # ─────── Coordinador ───────
 
+def _tiene_valor_real(data: dict, campo: str) -> bool:
+    """True si data[campo] existe y no es el placeholder '-' que usa
+    consultar_nit_basica() para NITs no inscritos."""
+    v = data.get(campo)
+    return bool(v) and v != '-'
+
+
 def consultar_nit(nit: str, tipo: str = "basica", attempt: int = 1):
+    """
+    Flujo (V4.14.0): DIAN primero (fuente oficial), TECNOPOS como fallback
+    y como complemento de email.
+
+    1. Consulta DIAN. Si responde con datos reales (persona o empresa
+       encontrada), esa es la respuesta — se marca `_fuente: 'DIAN'` y,
+       para personas, se intenta complementar el email desde TECNOPOS.
+    2. Si DIAN NO tiene datos reales — ya sea 'No Inscrito' (success con
+       placeholders '-') o un error definitivo — se intenta TECNOPOS como
+       apoyo, validando el DV contra calcular_dv() antes de aceptarlo (así
+       nunca se publica un dato de un tercero con DV que no cuadra).
+    3. Si tampoco TECNOPOS ayuda, se devuelve el resultado de DIAN tal cual
+       (No Inscrito o error), marcado `_fuente: 'DIAN'` cuando aplica.
+
+    TECNOPOS se consulta en CADA intento donde DIAN no tiene datos reales
+    (no solo en attempt==1) — mismo fix de V4.13.1: el estado definitivo de
+    DIAN (No Inscrito / error) a veces solo se confirma en el intento 2 o
+    3, y el dato de TECNOPOS no debe perderse por eso. 'retry' (timeout
+    ambiguo, solo posible en el intento 1) NO dispara el fallback —
+    deliberado, para no reemplazar por un dato sin confirmar un caso que
+    todavía podría resolverse bien solo reintentando.
+    """
     if tipo == "rut_detallado":
         return consultar_nit_rut_detallado(nit, attempt)
 
-    # Se consulta TECNOPOS en CADA intento (no solo el 1), a propósito: la
-    # UI reintenta DIAN hasta 3 veces cuando da 'retry' (timeout ambiguo en
-    # el primer intento), y ese 'retry' se vuelve 'error' recién en el
-    # intento 2/3. Si TECNOPOS solo se consultaba en el intento 1, el dato
-    # que ya teníamos guardado se perdía para siempre al llegar al intento
-    # final — bug real detectado con NITs 123456789/987654321: DIAN daba
-    # 'retry' en el intento 1 (fallback no aplicaba) y 'error' recién en el
-    # 2/3 (donde ya no se volvía a mirar TECNOPOS). TECNOPOS es rápido
-    # (~0.5-0.7s) y los reintentos ya son el camino lento de por sí, así
-    # que repetir esta consulta ahí no tiene costo real.
-    rapido = consultar_tecnopos(nit)
-    if rapido is not None:
-        if rapido.get('_es_persona'):
-            resultado_dian = consultar_nit_basica(nit, attempt)
-            if resultado_dian.get('status') == 'success':
-                return _merge_tecnopos_email_con_dian(resultado_dian, rapido)
-            if resultado_dian.get('status') == 'error':
-                # DIAN dio un error definitivo (no un timeout a
-                # reintentar) — aquí es donde TECNOPOS ayuda de verdad.
-                fallback = _fallback_tecnopos_sin_confirmar(nit, rapido)
-                if fallback:
-                    return fallback
-            # status == 'retry' (timeout ambiguo, solo posible en el
-            # intento 1 de DIAN): se deja seguir el flujo normal de
-            # reintentos sin tocar nada, para no reemplazar por un dato sin
-            # confirmar un caso que podría resolverse bien solo reintentando.
-            return resultado_dian
-        return rapido
-    return consultar_nit_basica(nit, attempt)
+    resultado_dian = consultar_nit_basica(nit, attempt)
+    data_dian = resultado_dian.get('data', {})
+
+    datos_reales = (
+        resultado_dian.get('status') == 'success'
+        and (_tiene_valor_real(data_dian, 'primerApellido')
+             or _tiene_valor_real(data_dian, 'razonSocial'))
+    )
+
+    if datos_reales:
+        data_dian['_fuente'] = 'DIAN'
+
+        # Persona con datos reales de DIAN: intentar complementar el email
+        # desde TECNOPOS (no tiene ambigüedad de orden, a diferencia del
+        # nombre — ver V4.12). Solo en el intento 1, igual que V4.12.
+        if _tiene_valor_real(data_dian, 'primerApellido') and attempt == 1:
+            tecnopos_persona = consultar_tecnopos(nit)
+            if tecnopos_persona and tecnopos_persona.get('_es_persona'):
+                email_tecnopos = tecnopos_persona.get('email', '')
+                if email_tecnopos and not data_dian.get('email'):
+                    data_dian['email'] = email_tecnopos
+                    data_dian['_email_fuente'] = 'TECNOPOS'
+
+        return resultado_dian
+
+    # DIAN sin datos reales: 'No Inscrito' (success con placeholders) o
+    # error definitivo — en ambos casos vale la pena intentar TECNOPOS.
+    if resultado_dian.get('status') in ('success', 'error'):
+        resultado_tecnopos = consultar_tecnopos(nit)
+        if resultado_tecnopos is not None:
+            dv_calculado = calcular_dv(str(nit))
+
+            if resultado_tecnopos.get('status') == 'success':
+                # Empresa — TECNOPOS ya trae el envelope {"status","data"}.
+                if str(dv_calculado) == str(resultado_tecnopos['data'].get('dv')):
+                    resultado_tecnopos['data']['_fuente'] = 'TECNOPOS'
+                    return resultado_tecnopos
+            elif resultado_tecnopos.get('_es_persona'):
+                # Persona natural sin confirmar — razón social completa,
+                # sin partir (ver _fallback_tecnopos_sin_confirmar).
+                if str(dv_calculado) == str(resultado_tecnopos.get('_dv_sin_confirmar')):
+                    fallback = _fallback_tecnopos_sin_confirmar(nit, resultado_tecnopos)
+                    if fallback:
+                        fallback['data']['_fuente'] = 'TECNOPOS'
+                        return fallback
+
+        # TECNOPOS no ayudó (nada, o DV no validado) — el dato de DIAN
+        # (No Inscrito) sigue siendo la respuesta definitiva.
+        if resultado_dian.get('status') == 'success':
+            data_dian['_fuente'] = 'DIAN'
+
+    return resultado_dian
