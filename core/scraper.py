@@ -606,9 +606,8 @@ def _fallback_tecnopos_sin_confirmar(nit: str, resultado_tecnopos: dict):
     algo: TECNOPOS es precisamente para eso — apoyar cuando DIAN no
     responde. Se usa la razón social COMPLETA sin partir en apellido/nombre
     (el orden de palabras de TECNOPOS no es confiable — ver
-    consultar_tecnopos) y se marca explícitamente en Observaciones como sin
-    confirmar, para que quede claro que no pasó por DIAN. Retorna None si
-    TECNOPOS tampoco tenía nada guardado (era una empresa, o falló)."""
+    consultar_tecnopos). Retorna None si TECNOPOS tampoco tenía nada
+    guardado (era una empresa, o falló)."""
     razon = resultado_tecnopos.get('_razon_social_sin_confirmar')
     if not razon:
         return None
@@ -621,7 +620,6 @@ def _fallback_tecnopos_sin_confirmar(nit: str, resultado_tecnopos: dict):
             "email": resultado_tecnopos.get('email', ''),
             "datetime": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             "tipo_consulta": "basica",
-            "observacion": "Dato de TECNOPOS sin confirmar en DIAN — verificar manualmente",
         },
         "error": None,
     }
@@ -642,14 +640,18 @@ def consultar_nit(nit: str, tipo: str = "basica", attempt: int = 1):
     y como complemento de email.
 
     1. Consulta DIAN. Si responde con datos reales (persona o empresa
-       encontrada), esa es la respuesta — se marca `_fuente: 'DIAN'` y,
-       para personas, se intenta complementar el email desde TECNOPOS.
+       encontrada), esa es la respuesta — para personas, se intenta
+       complementar el email desde TECNOPOS.
     2. Si DIAN NO tiene datos reales — ya sea 'No Inscrito' (success con
        placeholders '-') o un error definitivo — se intenta TECNOPOS como
        apoyo, validando el DV contra calcular_dv() antes de aceptarlo (así
        nunca se publica un dato de un tercero con DV que no cuadra).
     3. Si tampoco TECNOPOS ayuda, se devuelve el resultado de DIAN tal cual
-       (No Inscrito o error), marcado `_fuente: 'DIAN'` cuando aplica.
+       (No Inscrito o error).
+
+    No se audita de qué motor vino cada dato (V4.14.1: se quitó el campo
+    interno `_fuente` y la columna "Fuente" del Excel) — mismo Excel, mismos
+    campos, sin exponer nunca de dónde vino el dato (igual que V4.9-V4.13.1).
 
     TECNOPOS se consulta en CADA intento donde DIAN no tiene datos reales
     (no solo en attempt==1) — mismo fix de V4.13.1: el estado definitivo de
@@ -672,8 +674,6 @@ def consultar_nit(nit: str, tipo: str = "basica", attempt: int = 1):
     )
 
     if datos_reales:
-        data_dian['_fuente'] = 'DIAN'
-
         # Persona con datos reales de DIAN: intentar complementar el email
         # desde TECNOPOS (no tiene ambigüedad de orden, a diferencia del
         # nombre — ver V4.12). Solo en el intento 1, igual que V4.12.
@@ -697,7 +697,6 @@ def consultar_nit(nit: str, tipo: str = "basica", attempt: int = 1):
             if resultado_tecnopos.get('status') == 'success':
                 # Empresa — TECNOPOS ya trae el envelope {"status","data"}.
                 if str(dv_calculado) == str(resultado_tecnopos['data'].get('dv')):
-                    resultado_tecnopos['data']['_fuente'] = 'TECNOPOS'
                     return resultado_tecnopos
             elif resultado_tecnopos.get('_es_persona'):
                 # Persona natural sin confirmar — razón social completa,
@@ -705,12 +704,9 @@ def consultar_nit(nit: str, tipo: str = "basica", attempt: int = 1):
                 if str(dv_calculado) == str(resultado_tecnopos.get('_dv_sin_confirmar')):
                     fallback = _fallback_tecnopos_sin_confirmar(nit, resultado_tecnopos)
                     if fallback:
-                        fallback['data']['_fuente'] = 'TECNOPOS'
                         return fallback
 
         # TECNOPOS no ayudó (nada, o DV no validado) — el dato de DIAN
         # (No Inscrito) sigue siendo la respuesta definitiva.
-        if resultado_dian.get('status') == 'success':
-            data_dian['_fuente'] = 'DIAN'
 
     return resultado_dian

@@ -72,8 +72,7 @@ def apply_formatting(workbook, worksheet, df_out, tipo="COMPLETO", tipo_consulta
             'NIT': 15, 'DV': 5, 'Primer Apellido': 20, 'Segundo Apellido': 20,
             'Primer Nombre': 20, 'Otros Nombres': 16, 'Razón Social': 38,
             'Email': 26,
-            'Fecha Consulta': 19, 'Estado Consulta': 14, 'Tipo de Consulta': 10, 'Observaciones': 22,
-            'Fuente': 10
+            'Fecha Consulta': 19, 'Estado Consulta': 14, 'Tipo de Consulta': 10, 'Observaciones': 22
         }
     else:
         col_widths = {

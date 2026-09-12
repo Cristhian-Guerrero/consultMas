@@ -1,9 +1,9 @@
-# PROYECTO: consultMas V4.14.0
+# PROYECTO: consultMas V4.14.1
 
 **Cliente:** A.S. Contadores & Asesores SAS — Pasto, Colombia
 **Repo:** https://github.com/Cristhian-Guerrero/consultMas
 **Rama activa:** `refactor/modular-structure`
-**Última versión pusheada:** V4.14.0
+**Última versión pusheada:** V4.14.1
 
 > Este archivo es la fuente de verdad del proyecto — arquitectura, decisiones
 > de diseño, gotchas y estado real. Léelo primero al retomar sesión. La
@@ -57,19 +57,29 @@ la fuente oficial sea la primera palabra en todos los casos.
 encuentra") se preservó intacto** dentro de esta nueva arquitectura — sigue
 siendo la razón de ser del proyecto según el cliente. Lo nuevo en V4.14.0:
 
-- **Validación de DV antes de aceptar TECNOPOS** (nuevo, con `calcular_dv()`
-  — el mismo algoritmo oficial de 15 posiciones que ya usaba
+- **Validación de DV antes de aceptar TECNOPOS** (con `calcular_dv()` — el
+  mismo algoritmo oficial de 15 posiciones que ya usaba
   `consultar_nit_basica()`, no uno nuevo): si el DV que trae TECNOPOS no
   coincide con el DV calculado del NIT, se descarta y se conserva el
   resultado de DIAN. Filtra respuestas de TECNOPOS con datos inconsistentes
-  antes de que lleguen al Excel.
-- **Columna `Fuente`** (`DIAN` / `TECNOPOS`) en el Excel Express — auditoría
-  visible de qué motor respondió cada fila. Antes esto era invisible a
-  propósito (V4.9-V4.13.1: "nunca se expone al usuario de dónde vino el
-  dato"); ahora sí se expone, a pedido explícito del cliente.
+  antes de que lleguen al Excel. **Se mantiene en V4.14.1.**
 - El campo interno `_email_fuente` (no visible en Excel) marca cuándo el
   email de una persona vino de TECNOPOS en vez de DIAN — mismo mecanismo de
-  V4.12, ahora documentado junto a `_fuente`.
+  V4.12.
+
+**V4.14.1 revirtió la única pieza de auditoría visible que había agregado
+V4.14.0:** la columna `Fuente` (DIAN/TECNOPOS) del Excel y el campo interno
+`_fuente` que la alimentaba se quitaron por completo — vuelta al criterio
+de V4.9-V4.13.1 de "nunca exponer al usuario de dónde vino el dato". De
+paso, V4.14.1 también quitó el texto `"Dato de TECNOPOS sin confirmar en
+DIAN — verificar manualmente"` que `_fallback_tecnopos_sin_confirmar()`
+venía escribiendo en Observaciones desde V4.13 — con esto, **ya no queda
+ninguna señal visible en el Excel de que una fila vino sin confirmar de
+TECNOPOS** (ni columna, ni Observaciones); cuando ese fallback aplica, la
+fila cae al texto genérico "Consulta Express exitosa" en Observaciones,
+igual que un dato 100% de DIAN. Fue una decisión explícita del cliente
+("retornar al estado anterior"), documentada aquí porque revierte una
+protección de trazabilidad que sí existía desde V4.13.
 
 Detectar "DIAN sin datos reales" (para decidir si vale la pena intentar
 TECNOPOS) revisa que `primerApellido`/`razonSocial` no sean el placeholder
@@ -77,7 +87,7 @@ TECNOPOS) revisa que `primerApellido`/`razonSocial` no sean el placeholder
 `'success'` de DIAN no basta por sí solo, porque "No Inscrito" también es
 `'success'` (con campos en `"-"`), no `'error'`.
 
-## TECNOPOS (sipos.com.co) — fallback y complemento de email desde V4.14.0
+## TECNOPOS (sipos.com.co) — fallback y complemento de email desde V4.14
 
 Fuente NO oficial de un tercero (TECNOPOS, software POS), endpoint
 `GET https://sipos.com.co/api_rut.php?nit={nit}`, HTTP puro vía `requests`
@@ -193,24 +203,28 @@ NOMBRE, HTML id `primerNombre` → contiene el APELLIDO. Corregido en
 `inspeccion_dian.py` para NIT 79750160 (V4.8) y re-validado en V4.10 contra
 el histórico real (ver arriba).
 
-## Columnas del Excel (modo Express, desde V4.14.0)
+## Columnas del Excel (modo Express, 12 columnas desde V4.14.1 — igual que V4.11-V4.13.1)
 
 `NIT, DV, Primer Apellido, Segundo Apellido, Primer Nombre, Otros Nombres,
 Razón Social, Email, Fecha Consulta, Estado Consulta, Tipo de Consulta,
-Observaciones, Fuente`
+Observaciones`
 
 `Email` casi siempre viene de TECNOPOS (nunca de DIAN, que no expone ese
-campo) — "-" cuando no hay dato. `Fuente` (nueva en V4.14.0) es `DIAN` o
-`TECNOPOS`, según qué motor produjo la fila — ver arquitectura arriba.
-`Dirección/Ciudad/Actividad` se agregaron en V4.10 y se quitaron en V4.11:
-en la práctica casi siempre salían "-" (cuando TECNOPOS las trae, viene
-sin `dv`, y esa respuesta se descarta entera — no se publica un NIT sin DV
-confirmado — así que caía a DIAN, que tampoco las tiene), así que no
-aportaban valor real y se simplificó el Excel.
+campo) — "-" cuando no hay dato. `Dirección/Ciudad/Actividad` se agregaron
+en V4.10 y se quitaron en V4.11: en la práctica casi siempre salían "-"
+(cuando TECNOPOS las trae, viene sin `dv`, y esa respuesta se descarta
+entera — no se publica un NIT sin DV confirmado — así que caía a DIAN, que
+tampoco las tiene), así que no aportaban valor real y se simplificó el
+Excel.
 
-RUT Detallado no cambió: mismas columnas de siempre, sin Email ni Fuente
-(ese modo no pasa por TECNOPOS en absoluto — `consultar_nit()` delega
-directo a `consultar_nit_rut_detallado()`).
+**V4.14.0 había agregado una columna `Fuente` (DIAN/TECNOPOS); V4.14.1 la
+quitó** a pedido explícito del cliente — ver arquitectura arriba. El Excel
+no tiene ninguna señal (ni columna, ni texto en Observaciones) de qué
+motor resolvió cada fila desde V4.14.1.
+
+RUT Detallado no cambió: mismas columnas de siempre, sin Email (ese modo no
+pasa por TECNOPOS en absoluto — `consultar_nit()` delega directo a
+`consultar_nit_rut_detallado()`).
 
 ## Flujo de trabajo
 
@@ -241,10 +255,11 @@ directo a `consultar_nit_rut_detallado()`).
 - **V4.13** — TECNOPOS como último recurso cuando DIAN da error definitivo (no timeout) — razón social completa sin partir, marcada "sin confirmar" en Observaciones
 - **V4.13.1** — Fix: TECNOPOS se consulta en cada reintento, no solo el 1ro — el 'error' definitivo de DIAN casi siempre llega en el intento 2/3, y el dato de TECNOPOS se perdía si no se volvía a mirar ahí
 - **V4.14.0** — Inversión de arquitectura: DIAN primero siempre (fuente oficial), TECNOPOS pasa de acelerador a fallback/complemento de email. Se preserva íntegro el fallback "TECNOPOS ayuda cuando DIAN no encuentra" de V4.13/V4.13.1. Agrega: validación de DV (reutilizando `calcular_dv()` ya existente, algoritmo oficial de 15 posiciones) antes de aceptar cualquier dato de TECNOPOS; columna `Fuente` (DIAN/TECNOPOS) en el Excel Express como auditoría visible; se elimina `_merge_tecnopos_email_con_dian()` (código muerto tras el reordenamiento — su lógica quedó inline en el coordinador)
+- **V4.14.1** — Revierte la columna `Fuente` y el campo interno `_fuente` (12 columnas de nuevo, como V4.11-V4.13.1); también quita el texto "Dato de TECNOPOS sin confirmar en DIAN — verificar manualmente" que `_fallback_tecnopos_sin_confirmar()` escribía en Observaciones desde V4.13 — decisión explícita del cliente de no exponer de dónde vino el dato. Todo lo demás de V4.14.0 se mantiene intacto (DIAN primero, fallback TECNOPOS con validación de DV, email fallback)
 
 ## Pendiente / conocido sin resolver
 
 - Selector de RUT Detallado ausente en la UI (ver arriba) — confirmar con Betto.
 - "DROGUERIA DAGUA"-type: razones sociales sin sufijo reconocible, pérdida de velocidad (no de correctitud).
 - Testing en Windows real de V4.10 (Email/Dirección/Ciudad/Actividad + fix empresas) — pendiente confirmación de Betto.
-- **V4.14.0 solo se validó con tests unitarios (mocks, sin red real a DIAN/TECNOPOS)** — falta E2E real: correr Express contra NITs reales (persona DIAN, empresa DIAN, No Inscrito con y sin TECNOPOS) y confirmar visualmente el Excel de 13 columnas en Windows. Se hace vía push a CI (`refactor/modular-structure` → GitHub Actions compila el .exe), no local.
+- **V4.14.0/V4.14.1 solo se validaron con tests unitarios (mocks, sin red real a DIAN/TECNOPOS)** — falta E2E real: correr Express contra NITs reales (persona DIAN, empresa DIAN, No Inscrito con y sin TECNOPOS) y confirmar visualmente el Excel de 12 columnas en Windows. Se hace vía push a CI (`refactor/modular-structure` → GitHub Actions compila el .exe), no local.
