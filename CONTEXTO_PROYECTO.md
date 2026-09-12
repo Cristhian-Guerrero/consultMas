@@ -2,8 +2,8 @@
 
 **Cliente:** A.S. Contadores & Asesores SAS — Pasto, Colombia
 **Repo:** https://github.com/Cristhian-Guerrero/consultMas
-**Rama activa:** `refactor/modular-structure`
-**Última versión pusheada:** V4.14.1
+**Rama activa:** `develop` (Git Flow — ver abajo)
+**Última versión pusheada:** V4.14.1 (tag `v4.14.1`, release publicado)
 
 > Este archivo es la fuente de verdad del proyecto — arquitectura, decisiones
 > de diseño, gotchas y estado real. Léelo primero al retomar sesión. La
@@ -226,22 +226,77 @@ RUT Detallado no cambió: mismas columnas de siempre, sin Email (ese modo no
 pasa por TECNOPOS en absoluto — `consultar_nit()` delega directo a
 `consultar_nit_rut_detallado()`).
 
-## Flujo de trabajo
+## Estrategia de branches (Git Flow, desde V4.14.1)
 
-1. `source venv/bin/activate`
-2. Cambios en los módulos correspondientes
-3. Probar con `python main.py` (NO `app.py`, no existe en esta rama)
-4. Compilar-check + regresión offline antes de commit:
+- **`main`** → producción. Solo recibe merges de `develop` cuando hay una
+  release lista. Cada release lleva tag `vX.Y.Z` (ver abajo).
+- **`develop`** → desarrollo. Base de trabajo normal; recibe merges de
+  `feature/*` y `fix/*` vía PR.
+- **`feature/*`, `fix/*`** → ramas de corta duración, siempre creadas desde
+  `develop`, mergeadas de vuelta a `develop` vía PR.
+- `Master` (huérfana, un solo "Initial commit" con un README de 1 línea,
+  sin relación de ancestro con `main`) y `refactor/modular-structure` (ya
+  fusionada por completo a `develop`/`main`) se **eliminaron** en V4.14.1 —
+  ver commit de branching. El default branch del repo en GitHub pasó de
+  `Master` a `main`.
+
+## Versioning con tags y Releases (desde V4.14.1)
+
+Tags semánticos `vX.Y.Z` sobre `main`, creados **después** de mergear
+`develop → main`:
+
+```bash
+git checkout main && git merge --ff-only develop && git push origin main
+git tag -a v4.15.0 -m "Release v4.15.0: ..."
+git push origin v4.15.0
+```
+
+Esto dispara `build-windows.yml`, que reconoce el tag y sube el artifact
+como `ConsultaDIAN-v4.15.0` (con el .exe adentro ya renombrado igual, no
+`ConsultaDIAN.exe` genérico). Un release de GitHub con el .exe adjunto se
+crea a mano tras confirmar el build verde:
+
+```bash
+gh run download <run_id> -n ConsultaDIAN-v4.15.0   # o vía gh api si "path traversal" (ver abajo)
+gh release create v4.15.0 ConsultaDIAN-v4.15.0.exe --title "v4.15.0" --notes "..."
+```
+
+**Gotcha confirmado en V4.14.1:** `gh run download -n <nombre>` puede fallar
+con `would result in path traversal` para ciertos nombres de artifact (no
+identificada la causa exacta). Workaround que funcionó: `gh api
+repos/.../actions/artifacts/<id>/zip > artifact.zip` + `unzip`.
+
+Push normal (sin tag) a `main` o `develop` también compila y sube un
+artifact temporal: `ConsultaDIAN-Latest-main` / `ConsultaDIAN-Latest-develop`
+— pensado para verificar que compila, no para entregar al cliente. Un
+`pull_request` compila igual (CI) pero no publica ningún artifact.
+
+`feature/*`/`fix/*` NO disparan build automático a propósito: el nombre de
+artifact usa `github.ref_name` tal cual, que para esas ramas incluye la
+`/` del prefijo — un artifact no puede llamarse `ConsultaDIAN-Latest-feature/x`.
+Si se necesita en el futuro, hay que sanear el nombre (reemplazar `/` por
+`-`) antes de habilitar el trigger.
+
+## Flujo de trabajo (dentro de develop/feature)
+
+1. `git checkout develop && git pull` (o `git checkout -b feature/x develop`
+   para algo más grande)
+2. `source venv/bin/activate`
+3. Cambios en los módulos correspondientes
+4. Probar con `python main.py` (NO `app.py`, no existe en este árbol)
+5. Compilar-check + regresión offline antes de commit:
    ```bash
    python -m py_compile core/scraper.py ui/app.py core/excel.py
    ```
-5. Al terminar un cambio: **actualizar VERSION en `ui/app.py`,
+6. Al terminar un cambio: **actualizar VERSION en `ui/app.py`,
    `version_info.txt`, y este archivo** — mantenerlos sincronizados en el
    mismo commit.
-6. `git add <archivos> && git commit -m "..." && git push origin refactor/modular-structure`
-7. GitHub Actions compila el .exe automáticamente (`gh run watch <id>
+7. `git add <archivos> && git commit -m "..." && git push origin develop`
+   (o la rama `feature/*`, luego PR a `develop`)
+8. GitHub Actions compila el .exe automáticamente (`gh run watch <id>
    --repo Cristhian-Guerrero/consultMas --exit-status` para seguirlo)
-8. Descargar .exe desde Actions → Artifacts
+9. Cuando el trabajo en `develop` esté listo para salir a producción:
+   mergear a `main` y taguear (ver "Versioning con tags" arriba).
 
 ## Historial de versiones
 
@@ -255,7 +310,7 @@ pasa por TECNOPOS en absoluto — `consultar_nit()` delega directo a
 - **V4.13** — TECNOPOS como último recurso cuando DIAN da error definitivo (no timeout) — razón social completa sin partir, marcada "sin confirmar" en Observaciones
 - **V4.13.1** — Fix: TECNOPOS se consulta en cada reintento, no solo el 1ro — el 'error' definitivo de DIAN casi siempre llega en el intento 2/3, y el dato de TECNOPOS se perdía si no se volvía a mirar ahí
 - **V4.14.0** — Inversión de arquitectura: DIAN primero siempre (fuente oficial), TECNOPOS pasa de acelerador a fallback/complemento de email. Se preserva íntegro el fallback "TECNOPOS ayuda cuando DIAN no encuentra" de V4.13/V4.13.1. Agrega: validación de DV (reutilizando `calcular_dv()` ya existente, algoritmo oficial de 15 posiciones) antes de aceptar cualquier dato de TECNOPOS; columna `Fuente` (DIAN/TECNOPOS) en el Excel Express como auditoría visible; se elimina `_merge_tecnopos_email_con_dian()` (código muerto tras el reordenamiento — su lógica quedó inline en el coordinador)
-- **V4.14.1** — Revierte la columna `Fuente` y el campo interno `_fuente` (12 columnas de nuevo, como V4.11-V4.13.1); también quita el texto "Dato de TECNOPOS sin confirmar en DIAN — verificar manualmente" que `_fallback_tecnopos_sin_confirmar()` escribía en Observaciones desde V4.13 — decisión explícita del cliente de no exponer de dónde vino el dato. Todo lo demás de V4.14.0 se mantiene intacto (DIAN primero, fallback TECNOPOS con validación de DV, email fallback)
+- **V4.14.1** — Revierte la columna `Fuente` y el campo interno `_fuente` (12 columnas de nuevo, como V4.11-V4.13.1); también quita el texto "Dato de TECNOPOS sin confirmar en DIAN — verificar manualmente" que `_fallback_tecnopos_sin_confirmar()` escribía en Observaciones desde V4.13 — decisión explícita del cliente de no exponer de dónde vino el dato. Todo lo demás de V4.14.0 se mantiene intacto (DIAN primero, fallback TECNOPOS con validación de DV, email fallback). Además: se adopta Git Flow (`main`/`develop`, se elimina `Master` y `refactor/modular-structure`), se crea el primer tag `v4.14.1` con release en GitHub, y `build-windows.yml` pasa a generar artifacts con nombre profesional (`ConsultaDIAN-v4.14.1` en tags, `ConsultaDIAN-Latest-<rama>` en pushes normales, nada en pull requests)
 
 ## Pendiente / conocido sin resolver
 
