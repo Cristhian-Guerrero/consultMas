@@ -2,10 +2,10 @@ name: Build Windows Executable
 
 on:
   push:
-    branches: [ main, master, refactor/modular-structure ]
+    branches: [ main, develop ]
     tags: [ 'v*' ]
   pull_request:
-    branches: [ main, master ]
+    branches: [ main, develop ]
   workflow_dispatch:
 
 jobs:
@@ -70,10 +70,33 @@ jobs:
             throw "❌ No se generó dist\ConsultaDIAN.exe"
           }
 
-      - name: Upload artifact
+      # Nombre profesional y versionado: tags v* -> ConsultaDIAN-v4.14.1,
+      # cualquier otro push (main/develop) -> ConsultaDIAN-Latest-<rama>.
+      # Calculado una sola vez y reusado en el rename + en el artifact para
+      # no duplicar la condición.
+      - name: Set artifact name
+        id: artifact_name
         if: always()
+        shell: bash
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            echo "name=ConsultaDIAN-${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "name=ConsultaDIAN-Latest-${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Rename executable
+        if: always()
+        shell: powershell
+        run: |
+          Copy-Item "dist\ConsultaDIAN.exe" "dist\${{ steps.artifact_name.outputs.name }}.exe"
+
+      # Pull requests: se compila igual (como validación de CI) pero no se
+      # publica ningún artifact descargable.
+      - name: Upload artifact
+        if: always() && github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
-          name: ConsultaDIAN-Windows-${{ github.sha }}
-          path: dist/ConsultaDIAN.exe
+          name: ${{ steps.artifact_name.outputs.name }}
+          path: dist/${{ steps.artifact_name.outputs.name }}.exe
           retention-days: 30
